@@ -29,8 +29,12 @@ def calculate(txn: TransactionInput) -> CalculationResult:
     """Calculate capital gains tax for a transaction."""
     try:
         return calculate_transaction(txn)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid input: {e}")
+    except ZeroDivisionError as e:
+        raise HTTPException(status_code=422, detail=f"Calculation error: {e}")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal calculation error: {type(e).__name__}")
 
 
 @router.get("/cpi/{year}")

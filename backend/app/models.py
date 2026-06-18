@@ -59,12 +59,12 @@ class Seller(BaseModel):
     # Income data for prisa (spreading)
     annual_incomes: dict[int, float] = Field(
         default_factory=dict,
-        description="Annual income by year for prisa calculation",
+        description="Annual income by year for prisa calculation (years 2000-2030)",
     )
     # Per-year max mode for prisa
     prisa_max_years: list[int] = Field(
         default_factory=list,
-        description="Years where max mode (25% cap) applies instead of manual income",
+        description="Years where max mode (25% cap) applies (years 2000-2030)",
     )
 
 

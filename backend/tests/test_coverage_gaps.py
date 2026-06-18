@@ -319,8 +319,8 @@ class TestRoutesEdgeCases:
                 ],
             }
             response = client.post("/api/calculate", json=payload)
-            assert response.status_code == 400
-            assert "test error" in response.json()["detail"]
+            assert response.status_code == 422
+            assert "Invalid input" in response.json()["detail"]
 
     def test_prisa_comparison_endpoint(self):
         """Test prisa comparison endpoint."""

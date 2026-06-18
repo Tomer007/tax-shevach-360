@@ -9,4 +9,6 @@ services:
         value: "3.11"
       - key: NODE_VERSION
         value: "20"
+      - key: CORS_ORIGINS
+        value: "https://mas-shevach-360.onrender.com"
     healthCheckPath: /health

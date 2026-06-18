@@ -1,5 +1,6 @@
 """FastAPI application for Mas Shevach 360."""
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -17,10 +18,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS for frontend
+# CORS: restricted by default, configurable via env var
+# In production (Render): set CORS_ORIGINS=https://mas-shevach-360.onrender.com
+ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://localhost:5173",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
