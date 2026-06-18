@@ -52,7 +52,7 @@ class Seller(BaseModel):
 
     name: str
     id_number: str
-    birth_date: date
+    birth_date: Optional[date] = None
     share_percent: float = Field(ge=0, le=100, description="Ownership share %")
     is_israeli_resident: bool = True
     marital_status: str = "single"
@@ -73,7 +73,7 @@ class AcquisitionPart(BaseModel):
 
     acquisition_date: date
     acquisition_type: AcquisitionType = AcquisitionType.PURCHASE
-    amount: float = Field(gt=0)
+    amount: Optional[float] = Field(default=None, ge=0)
     currency: Currency = Currency.ILS
     share_percent: float = Field(ge=0, le=100, description="Share acquired in this event")
     # For inheritance

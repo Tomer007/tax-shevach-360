@@ -34,7 +34,7 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
 
   const canContinue =
     acquisitions.length > 0 &&
-    acquisitions.every((a) => a.acquisition_date && a.amount > 0)
+    acquisitions.every((a) => a.acquisition_date && (a.amount ?? 0) > 0)
 
   // Start with one acquisition if empty
   if (acquisitions.length === 0) {

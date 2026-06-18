@@ -75,9 +75,12 @@ class ParsedContract(BaseModel):
     sale_amount: float | None = None
     sale_currency: str | None = "ILS"
     sellers: list[dict] = Field(default_factory=list)
+    buyers: list[dict] = Field(default_factory=list)
     acquisitions: list[dict] = Field(default_factory=list)
     property_address: str | None = None
     block_parcel: str | None = None
+    property_type: str | None = None
+    payment_schedule: str | None = None
     notes: str | None = None
     raw_text: str = Field(default="", exclude=True)  # Excluded from API response
     confidence: str = "low"
@@ -134,9 +137,12 @@ def parse_contract_text(text: str) -> ParsedContract:
         sale_amount=sale_amount,
         sale_currency=data.get("sale_currency") or "ILS",
         sellers=data.get("sellers") or [],
+        buyers=data.get("buyers") or [],
         acquisitions=data.get("acquisitions") or [],
         property_address=data.get("property_address"),
         block_parcel=data.get("block_parcel"),
+        property_type=data.get("property_type"),
+        payment_schedule=data.get("payment_schedule"),
         notes=data.get("notes"),
         raw_text=text[:200],
         confidence=confidence,
@@ -207,9 +213,12 @@ def parse_contract_images(images_b64: list[str]) -> ParsedContract:
         sale_amount=sale_amount,
         sale_currency=data.get("sale_currency") or "ILS",
         sellers=data.get("sellers") or [],
+        buyers=data.get("buyers") or [],
         acquisitions=data.get("acquisitions") or [],
         property_address=data.get("property_address"),
         block_parcel=data.get("block_parcel"),
+        property_type=data.get("property_type"),
+        payment_schedule=data.get("payment_schedule"),
         notes=data.get("notes"),
         raw_text="[parsed from images via Vision]",
         confidence=confidence,

@@ -124,14 +124,23 @@ class TestAcquisitionPart:
         assert part.acquisition_type == AcquisitionType.PURCHASE
         assert part.currency == Currency.ILS
 
-    def test_zero_amount_invalid(self):
-        """Zero amount is invalid (must be > 0)."""
-        with pytest.raises(ValidationError):
-            AcquisitionPart(
-                acquisition_date=date(2010, 1, 1),
-                amount=0,
-                share_percent=100.0,
-            )
+    def test_zero_amount_valid(self):
+        """Zero amount is valid (amount is optional, user fills later)."""
+        part = AcquisitionPart(
+            acquisition_date=date(2010, 1, 1),
+            amount=0,
+            share_percent=100.0,
+        )
+        assert part.amount == 0
+
+    def test_none_amount_valid(self):
+        """None amount is valid (not available from contract)."""
+        part = AcquisitionPart(
+            acquisition_date=date(2010, 1, 1),
+            amount=None,
+            share_percent=100.0,
+        )
+        assert part.amount is None
 
     def test_negative_amount_invalid(self):
         """Negative amount is invalid."""

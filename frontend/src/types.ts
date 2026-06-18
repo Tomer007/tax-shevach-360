@@ -8,7 +8,7 @@ export type DepreciationRate = '2_full' | '1.5_building' | '2_building' | '4_bui
 export interface Seller {
   name: string
   id_number: string
-  birth_date: string // ISO date
+  birth_date: string // ISO date, optional - may not be in contract
   share_percent: number
   is_israeli_resident: boolean
   marital_status: string
@@ -19,7 +19,7 @@ export interface Seller {
 export interface AcquisitionPart {
   acquisition_date: string
   acquisition_type: AcquisitionType
-  amount: number
+  amount: number | null // May not be available from sale contract
   currency: Currency
   share_percent: number
   deceased_eligible_for_exemption: boolean

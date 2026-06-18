@@ -48,13 +48,15 @@ from app.tax_rates import (
 )
 
 
-def _convert_to_ils_static(amount: float, currency: Currency) -> float:
+def _convert_to_ils_static(amount: float | None, currency: Currency) -> float:
     """Convert amount to ILS using fixed historical rates (for non-API contexts).
 
     For ILS: return as-is.
     For ILP/ILR: use fixed conversion.
     For USD/EUR/GBP: return as-is (caller should provide ILS or use API).
     """
+    if amount is None:
+        return 0.0
     if currency == Currency.ILS:
         return amount
     if currency == Currency.ILP:
