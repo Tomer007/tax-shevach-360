@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from app.calculator import calculate_transaction
 from app.models import CalculationResult, TransactionInput
 from app.routes import router
+from app.auth_routes import router as auth_router
 
 app = FastAPI(
     title="Mas Shevach 360",
@@ -34,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
 
 
 @app.get("/health")
