@@ -75,8 +75,10 @@ def parse_contract_text(text: str) -> ParsedContract:
 
     client = OpenAI(api_key=OPENAI_API_KEY)
 
+    model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[
             {"role": "system", "content": EXTRACTION_PROMPT},
             {"role": "user", "content": f"Extract transaction details from this contract:\n\n{text}"},

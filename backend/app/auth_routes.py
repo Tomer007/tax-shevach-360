@@ -14,6 +14,7 @@ from app.auth import (
     verify_code_name,
 )
 from app.contract_parser import ParsedContract, parse_contract_text
+from app.email_service import send_contract_result_email
 
 router = APIRouter()
 
@@ -74,16 +75,19 @@ async def upload_contract(
     # Extract text based on file type
     filename = file.filename.lower()
     text = ""
+    is_pdf = filename.endswith(".pdf") or content[:5] == b"%PDF-"
 
-    if filename.endswith(".pdf"):
+    if is_pdf:
         # Extract text from PDF using PyMuPDF
         try:
             doc = fitz.open(stream=content, filetype="pdf")
             for page in doc:
-                text += page.get_text()
+                page_text = page.get_text()
+                if page_text:
+                    text += page_text + "\n"
             doc.close()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Could not read PDF file")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read PDF file: {str(e)}")
     else:
         # Try as text file
         try:
@@ -106,5 +110,8 @@ async def upload_contract(
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Parsing failed: {type(e).__name__}")
+
+    # Send email notification with parsed results
+    send_contract_result_email(result.model_dump(), file.filename or "unknown")
 
     return result

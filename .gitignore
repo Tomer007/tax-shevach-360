@@ -6,6 +6,7 @@ __pycache__/
 .coverage
 htmlcov/
 .pytest_cache/
+.env
 
 # Node
 frontend/node_modules/
