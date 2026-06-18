@@ -1,5 +1,7 @@
 """Authentication and contract upload routes."""
 
+import fitz  # PyMuPDF
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 
 from app.auth import (
@@ -66,23 +68,36 @@ async def upload_contract(
     # Read file content
     content = await file.read()
 
-    # Decode text
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        # Try latin-1 as fallback
+    if len(content) > 10_000_000:
+        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+    # Extract text based on file type
+    filename = file.filename.lower()
+    text = ""
+
+    if filename.endswith(".pdf"):
+        # Extract text from PDF using PyMuPDF
         try:
-            text = content.decode("latin-1")
+            doc = fitz.open(stream=content, filetype="pdf")
+            for page in doc:
+                text += page.get_text()
+            doc.close()
         except Exception:
-            raise HTTPException(status_code=400, detail="Could not read file encoding")
+            raise HTTPException(status_code=400, detail="Could not read PDF file")
+    else:
+        # Try as text file
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                text = content.decode("latin-1")
+            except Exception:
+                raise HTTPException(status_code=400, detail="Could not read file encoding")
 
     if not text.strip():
-        raise HTTPException(status_code=400, detail="File is empty")
+        raise HTTPException(status_code=400, detail="No text could be extracted from file")
 
-    if len(text) > 2_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 2MB text)")
-
-    # Truncate for AI processing - model only needs first portion for extraction
+    # Truncate for AI processing
     text_for_parsing = text[:30_000]
 
     try:

@@ -128,9 +128,9 @@ class TestContractUpload:
         assert response.status_code == 400
 
     def test_upload_too_large(self):
-        """Files over 2MB are rejected."""
+        """Files over 10MB are rejected."""
         token = self._get_token()
-        large_content = b"x" * 2_100_000
+        large_content = b"x" * 10_100_000
         response = client.post(
             "/api/upload-contract",
             files={"file": ("test.txt", large_content)},
