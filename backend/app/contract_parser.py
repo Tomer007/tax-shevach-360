@@ -127,3 +127,76 @@ def parse_contract_text(text: str) -> ParsedContract:
         raw_text=text[:200],
         confidence=confidence,
     )
+
+
+def parse_contract_images(images_b64: list[str]) -> ParsedContract:
+    """Parse contract from page images using OpenAI Vision (GPT-4o).
+
+    Used for scanned PDFs or PDFs without text layer.
+    Sends page images directly to GPT-4o which can read Hebrew text from images.
+    """
+    if not OPENAI_API_KEY:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    # Build messages with images
+    content_parts: list[dict] = [
+        {"type": "text", "text": "Extract transaction details from this Israeli real estate contract (חוזה מכר). The pages are shown as images below."},
+    ]
+    for img_b64 in images_b64:
+        content_parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{img_b64}", "detail": "high"},
+        })
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Vision requires gpt-4o (not mini)
+            messages=[
+                {"role": "system", "content": EXTRACTION_PROMPT},
+                {"role": "user", "content": content_parts},
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            timeout=60.0,  # Vision takes longer
+            max_tokens=4000,
+        )
+    except openai.AuthenticationError:
+        raise ValueError("AI service configuration error - invalid API key")
+    except openai.RateLimitError:
+        raise ValueError("AI service temporarily unavailable - rate limited")
+    except openai.APITimeoutError:
+        raise ValueError("AI service timed out - please try again")
+
+    content_str = response.choices[0].message.content or "{}"
+
+    try:
+        data = json.loads(content_str)
+    except json.JSONDecodeError:
+        return ParsedContract(confidence="failed")
+
+    # Validate numeric
+    sale_amount = data.get("sale_amount")
+    if sale_amount is not None:
+        try:
+            sale_amount = float(sale_amount)
+        except (ValueError, TypeError):
+            sale_amount = None
+
+    has_sale = data.get("sale_date") and sale_amount
+    has_sellers = bool(data.get("sellers"))
+    confidence = "high" if (has_sale and has_sellers) else "medium" if has_sale else "low"
+
+    return ParsedContract(
+        sale_date=data.get("sale_date"),
+        sale_amount=sale_amount,
+        sale_currency=data.get("sale_currency") or "ILS",
+        sellers=data.get("sellers") or [],
+        acquisitions=data.get("acquisitions") or [],
+        property_address=data.get("property_address"),
+        block_parcel=data.get("block_parcel"),
+        notes=data.get("notes"),
+        raw_text="[parsed from images via Vision]",
+        confidence=confidence,
+    )

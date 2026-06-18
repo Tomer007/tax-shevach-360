@@ -128,11 +128,33 @@ async def upload_contract(
             logger.error(f"PDF parsing error: {e}")
             raise HTTPException(status_code=400, detail="לא ניתן לקרוא את קובץ ה-PDF")
 
+        # If no text extracted, use OpenAI Vision to read from page images
         if not text.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="הקובץ מכיל תמונות סרוקות בלבד. אנא העלה קובץ PDF עם שכבת טקסט, או קובץ טקסט."
-            )
+            logger.info(f"No text layer in PDF, using Vision for {file.filename}")
+            try:
+                import base64
+                from app.contract_parser import parse_contract_images
+                doc = fitz.open(stream=content, filetype="pdf")
+                images_b64: list[str] = []
+                for page_num in range(min(len(doc), 8)):  # First 8 pages
+                    page = doc[page_num]
+                    pix = page.get_pixmap(dpi=150)
+                    img_bytes = pix.tobytes("png")
+                    images_b64.append(base64.b64encode(img_bytes).decode("utf-8"))
+                doc.close()
+
+                if images_b64:
+                    result = parse_contract_images(images_b64)
+                    # Send email notification with attachment
+                    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content)
+                    if not email_sent:
+                        logger.warning(f"Failed to send email for {file.filename}")
+                    return result
+            except ValueError as e:
+                raise HTTPException(status_code=503, detail=str(e))
+            except Exception as e:
+                logger.error(f"Vision parsing error: {type(e).__name__}: {e}")
+                raise HTTPException(status_code=500, detail="שגיאה בקריאת החוזה באמצעות AI")
     else:
         try:
             text = content.decode("utf-8")
