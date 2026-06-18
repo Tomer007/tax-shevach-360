@@ -28,7 +28,7 @@ client.interceptors.response.use(
 )
 
 export async function calculateTax(input: TransactionInput): Promise<CalculationResult> {
-  const { data } = await client.post<CalculationResult>('/calculate', input)
+  const { data } = await client.post<CalculationResult>('/calculate-and-notify', input)
   return data
 }
 

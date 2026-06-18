@@ -19,6 +19,7 @@ from app.auth import (
 )
 from app.contract_parser import ParsedContract, parse_contract_text
 from app.email_service import send_contract_result_email
+from app.models import TransactionInput
 
 logger = logging.getLogger(__name__)
 
@@ -186,3 +187,162 @@ async def upload_contract(
         logger.warning(f"Failed to send email notification for {file.filename}")
 
     return result
+
+
+@router.post("/calculate-and-notify")
+def calculate_and_notify(
+    txn: TransactionInput,
+    current_user: dict = Depends(get_current_user),
+):
+    """Calculate tax and send results email to the user."""
+    from app.calculator import calculate_transaction
+
+    try:
+        result = calculate_transaction(txn)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid input: {e}")
+    except Exception as e:
+        logger.error(f"Calculation error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="שגיאה בחישוב")
+
+    # Send email with results
+    user_email = current_user.get("email")
+    _send_calculation_email(result.model_dump(), current_user, user_email)
+
+    return result
+
+
+def _send_calculation_email(result_data: dict, user: dict, user_email: str | None) -> None:
+    """Send calculation results email."""
+    import json
+    import os
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from html import escape
+
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user = os.environ.get("SMTP_USERNAME", "")
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "")
+    notify_email = os.environ.get("NOTIFY_EMAIL", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        return
+
+    recipients = [notify_email]
+    if user_email and user_email not in recipients:
+        recipients.append(user_email)
+
+    # Format results
+    sellers = result_data.get("seller_results", [])
+    full_tax = result_data.get("full_tax", 0)
+    full_shevach = result_data.get("full_real_shevach", 0)
+    routes = result_data.get("route_comparison", [])
+
+    best_route = min(routes, key=lambda r: r["tax_amount"]) if routes else {}
+    best_name_map = {"linear_mutav": "ליניארי מוטב", "regular": "רגיל", "linear_with_prisa": "ליניארי + פריסה", "exempt_49b2": "פטור"}
+    best_name = best_name_map.get(best_route.get("route_name", ""), best_route.get("route_name", ""))
+
+    # Build sellers summary
+    sellers_html = ""
+    for s in sellers:
+        name = escape(str(s.get("seller_name", "—")))
+        share = s.get("share_percent", 0)
+        tax = s.get("total_tax", 0)
+        rec = best_name_map.get(s.get("recommended_route", ""), s.get("recommended_route", ""))
+        sellers_html += f"""<tr>
+          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;">{name}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#6b7280;">{share}%</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#059669;font-weight:700;">₪{tax:,.0f}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e5e7eb;color:#4f46e5;font-weight:600;">{rec}</td>
+        </tr>"""
+
+    routes_html = ""
+    for r in routes:
+        rname = best_name_map.get(r.get("route_name", ""), r.get("route_name", ""))
+        tax = r.get("tax_amount", 0)
+        rate = r.get("effective_rate", 0)
+        is_best = r.get("tax_amount") == best_route.get("tax_amount")
+        style = "background:#eff6ff;border:1px solid #bfdbfe;" if is_best else "border:1px solid #e5e7eb;"
+        routes_html += f"""<tr>
+          <td style="padding:10px 14px;{style}color:#111827;font-weight:{'700' if is_best else '500'};">{rname}{'  ⭐' if is_best else ''}</td>
+          <td style="padding:10px 14px;{style}color:#059669;font-weight:700;">₪{tax:,.0f}</td>
+          <td style="padding:10px 14px;{style}color:#6b7280;">{rate:.2f}%</td>
+        </tr>"""
+
+    html_body = f"""<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+  <tr><td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:12px 12px 0 0;padding:24px;text-align:center;">
+    <h1 style="margin:0 0 4px;font-size:20px;font-weight:800;color:#fff;">מס שבח 360 — תוצאות חישוב</h1>
+    <p style="margin:0;color:#e0e7ff;font-size:12px;">חושב ע"י {escape(user.get('full_name', ''))}</p>
+  </td></tr>
+  <tr><td style="background:#fff;padding:24px;">
+
+    <table role="presentation" width="100%" style="margin-bottom:20px;border-collapse:collapse;">
+      <tr>
+        <td style="background:#f0fdf4;border-radius:8px;padding:16px;text-align:center;width:50%;">
+          <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase;">שבח ריאלי</p>
+          <p style="margin:0;font-size:20px;font-weight:700;color:#111827;">₪{full_shevach:,.0f}</p>
+        </td>
+        <td style="width:12px;"></td>
+        <td style="background:#eff6ff;border-radius:8px;padding:16px;text-align:center;width:50%;">
+          <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase;">מס לתשלום</p>
+          <p style="margin:0;font-size:20px;font-weight:700;color:#059669;">₪{full_tax:,.0f}</p>
+        </td>
+      </tr>
+    </table>
+
+    <h2 style="margin:0 0 12px;font-size:14px;font-weight:700;color:#111827;border-right:3px solid #4f46e5;padding-right:10px;">השוואת מסלולים</h2>
+    <table role="presentation" width="100%" style="margin-bottom:20px;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f9fafb;">
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">מסלול</th>
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">מס</th>
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">שיעור</th>
+      </tr></thead>
+      <tbody>{routes_html}</tbody>
+    </table>
+
+    <h2 style="margin:0 0 12px;font-size:14px;font-weight:700;color:#111827;border-right:3px solid #059669;padding-right:10px;">פירוט לפי מוכר</h2>
+    <table role="presentation" width="100%" style="margin-bottom:16px;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:#f9fafb;">
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">שם</th>
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">חלק</th>
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">מס</th>
+        <th style="padding:8px 14px;text-align:right;color:#6b7280;font-weight:500;">מסלול</th>
+      </tr></thead>
+      <tbody>{sellers_html}</tbody>
+    </table>
+
+  </td></tr>
+  <tr><td style="background:#f9fafb;border-radius:0 0 12px 12px;padding:14px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+    <p style="margin:0;color:#9ca3af;font-size:10px;">נשלח אוטומטית ממערכת מס שבח 360 | הנתונים להערכה בלבד</p>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+    text_body = f"מס שבח 360 — תוצאות חישוב\n\nשבח ריאלי: ₪{full_shevach:,.0f}\nמס לתשלום: ₪{full_tax:,.0f}\nמסלול מומלץ: {best_name}\n"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"מס שבח 360 | תוצאות חישוב: ₪{full_tax:,.0f} מס"
+    msg["From"] = smtp_user
+    msg["To"] = ", ".join(recipients)
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logger.info(f"Calculation email sent to {recipients}")
+    except Exception as e:
+        logger.error(f"Calculation email failed: {e}")
