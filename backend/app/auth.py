@@ -31,12 +31,21 @@ _TOMER_HASH = "$2b$12$LK8vQx5R8y5z5z5z5z5z5OH6.Yw1Yw1Yw1Yw1Yw1Yw1Yw1Yw1Y"
 _TOMER_HASH = bcrypt.hashpw(b"gur", bcrypt.gensalt()).decode("utf-8")
 
 # Users (loaded from env if available)
+_HAGGI_HASH = bcrypt.hashpw("חכם".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
 VALID_USERS = {
     os.environ.get("APP_USERNAME", "tomer"): {
         "username": os.environ.get("APP_USERNAME", "tomer"),
         "hashed_password": _TOMER_HASH,
         "full_name": os.environ.get("APP_USER_FULLNAME", "Tomer Gur"),
-    }
+        "email": "tomergur@gmail.com",
+    },
+    "חגי": {
+        "username": "חגי",
+        "hashed_password": _HAGGI_HASH,
+        "full_name": "חגי חכם",
+        "email": "haggai@haham-law.com",
+    },
 }
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")

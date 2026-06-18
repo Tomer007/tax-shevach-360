@@ -146,7 +146,8 @@ async def upload_contract(
                 if images_b64:
                     result = parse_contract_images(images_b64)
                     # Send email notification with attachment
-                    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content)
+                    user_email = current_user.get("email")
+                    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
                     if not email_sent:
                         logger.warning(f"Failed to send email for {file.filename}")
                     return result
@@ -179,7 +180,8 @@ async def upload_contract(
         raise HTTPException(status_code=500, detail="שגיאה בניתוח החוזה. נסה שוב.")
 
     # Send email notification with attachment (non-blocking, failures are logged)
-    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content)
+    user_email = current_user.get("email")
+    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
     if not email_sent:
         logger.warning(f"Failed to send email notification for {file.filename}")
 

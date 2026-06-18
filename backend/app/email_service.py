@@ -20,6 +20,7 @@ def send_contract_result_email(
     parsed_data: dict,
     filename: str,
     file_content: bytes | None = None,
+    user_email: str | None = None,
 ) -> bool:
     """Send parsed contract results with attachment to the configured email."""
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -31,6 +32,11 @@ def send_contract_result_email(
     if not smtp_user or not smtp_pass:
         logger.warning("SMTP credentials not configured, skipping email")
         return False
+
+    # Build recipient list (notify + user if different)
+    recipients = [notify_email]
+    if user_email and user_email not in recipients:
+        recipients.append(user_email)
 
     # Extract and sanitize values
     safe_filename = escape(str(filename))
@@ -200,7 +206,7 @@ JSON:
     msg = MIMEMultipart("mixed")
     msg["Subject"] = f"מס שבח 360 | חוזה חדש: {safe_filename}"
     msg["From"] = smtp_user
-    msg["To"] = notify_email
+    msg["To"] = ", ".join(recipients)
 
     alt_part = MIMEMultipart("alternative")
     alt_part.attach(MIMEText(text_body, "plain", "utf-8"))
