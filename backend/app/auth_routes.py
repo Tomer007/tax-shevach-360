@@ -156,8 +156,8 @@ async def upload_contract(
         logger.error(f"Contract parsing error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="שגיאה בניתוח החוזה. נסה שוב.")
 
-    # Send email notification (non-blocking, failures are logged)
-    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown")
+    # Send email notification with attachment (non-blocking, failures are logged)
+    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content)
     if not email_sent:
         logger.warning(f"Failed to send email notification for {file.filename}")
 
