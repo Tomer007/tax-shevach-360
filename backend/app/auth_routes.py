@@ -1,5 +1,6 @@
 """Authentication and contract upload routes."""
 
+import logging
 import fitz  # PyMuPDF
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
@@ -15,6 +16,8 @@ from app.auth import (
 )
 from app.contract_parser import ParsedContract, parse_contract_text
 from app.email_service import send_contract_result_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -68,6 +71,7 @@ async def upload_contract(
 
     # Read file content
     content = await file.read()
+    logger.info(f"Upload: filename={file.filename}, size={len(content)} bytes, content_type={file.content_type}")
 
     if len(content) > 10_000_000:
         raise HTTPException(status_code=400, detail="File too large (max 10MB)")
@@ -100,6 +104,8 @@ async def upload_contract(
 
     if not text.strip():
         raise HTTPException(status_code=400, detail="No text could be extracted from file")
+
+    logger.info(f"Extracted {len(text)} chars from {file.filename}. First 100: {text[:100]}")
 
     # Truncate for AI processing
     text_for_parsing = text[:30_000]

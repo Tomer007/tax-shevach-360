@@ -46,7 +46,6 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       const { data } = await axios.post('/api/upload-contract', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
         },
       })
 
