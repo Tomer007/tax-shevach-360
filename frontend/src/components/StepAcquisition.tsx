@@ -1,0 +1,145 @@
+import type { TransactionInput, AcquisitionPart, Currency, AcquisitionType } from '../types'
+
+interface Props {
+  formData: Partial<TransactionInput>
+  updateForm: (partial: Partial<TransactionInput>) => void
+  onNext: () => void
+  onPrev: () => void
+}
+
+const emptyAcquisition: AcquisitionPart = {
+  acquisition_date: '',
+  acquisition_type: 'purchase',
+  amount: 0,
+  currency: 'ILS',
+  share_percent: 100,
+  deceased_eligible_for_exemption: false,
+}
+
+export default function StepAcquisition({ formData, updateForm, onNext, onPrev }: Props) {
+  const acquisitions = formData.acquisitions ?? []
+
+  function addAcquisition() {
+    updateForm({ acquisitions: [...acquisitions, { ...emptyAcquisition }] })
+  }
+
+  function updateAcq(idx: number, partial: Partial<AcquisitionPart>) {
+    const updated = acquisitions.map((a, i) => (i === idx ? { ...a, ...partial } : a))
+    updateForm({ acquisitions: updated })
+  }
+
+  function removeAcq(idx: number) {
+    updateForm({ acquisitions: acquisitions.filter((_, i) => i !== idx) })
+  }
+
+  const canContinue =
+    acquisitions.length > 0 &&
+    acquisitions.every((a) => a.acquisition_date && a.amount > 0)
+
+  // Start with one acquisition if empty
+  if (acquisitions.length === 0) {
+    addAcquisition()
+    return null
+  }
+
+  return (
+    <div className="card">
+      <h3 className="card-title">פרטי הרכישה</h3>
+
+      {acquisitions.map((acq, idx) => (
+        <div key={idx} className="seller-card">
+          <div className="seller-header">
+            <h4>רכישה {idx + 1}</h4>
+            {acquisitions.length > 1 && (
+              <button className="btn btn-danger btn-sm" onClick={() => removeAcq(idx)} type="button">
+                הסר
+              </button>
+            )}
+          </div>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>תאריך רכישה</label>
+              <input
+                type="date"
+                value={acq.acquisition_date}
+                onChange={(e) => updateAcq(idx, { acquisition_date: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>אופן הרכישה</label>
+              <select
+                value={acq.acquisition_type}
+                onChange={(e) => updateAcq(idx, { acquisition_type: e.target.value as AcquisitionType })}
+              >
+                <option value="purchase">רכישה</option>
+                <option value="inheritance">ירושה</option>
+                <option value="gift">מתנה</option>
+                <option value="divorce">גירושין</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>סכום הרכישה</label>
+              <input
+                type="number"
+                min={0}
+                value={acq.amount || ''}
+                onChange={(e) => updateAcq(idx, { amount: Number(e.target.value) })}
+                placeholder="סכום"
+              />
+            </div>
+            <div className="form-group">
+              <label>מטבע</label>
+              <select
+                value={acq.currency}
+                onChange={(e) => updateAcq(idx, { currency: e.target.value as Currency })}
+              >
+                <option value="ILS">₪ שקל חדש</option>
+                <option value="USD">$ דולר</option>
+                <option value="EUR">€ אירו</option>
+                <option value="GBP">£ לירה שטרלינג</option>
+                <option value="ILP">לי"ר ישראלית</option>
+                <option value="ILR">שקל ישן</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>חלק שנרכש (%)</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={acq.share_percent}
+                onChange={(e) => updateAcq(idx, { share_percent: Number(e.target.value) })}
+              />
+            </div>
+            {acq.acquisition_type === 'inheritance' && (
+              <div className="form-group">
+                <div className="checkbox-group">
+                  <input
+                    type="checkbox"
+                    id={`deceased-exempt-${idx}`}
+                    checked={acq.deceased_eligible_for_exemption}
+                    onChange={(e) => updateAcq(idx, { deceased_eligible_for_exemption: e.target.checked })}
+                  />
+                  <label htmlFor={`deceased-exempt-${idx}`}>המנוח היה זכאי לפטור</label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <button className="btn btn-secondary btn-sm" onClick={addAcquisition} type="button">
+        + הוסף רכישה נוספת
+      </button>
+
+      <div className="btn-group">
+        <button className="btn btn-secondary" onClick={onPrev} type="button">
+          הקודם →
+        </button>
+        <button className="btn btn-primary" onClick={onNext} disabled={!canContinue} type="button">
+          ← הבא
+        </button>
+      </div>
+    </div>
+  )
+}

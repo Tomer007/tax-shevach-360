@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: mas-shevach-360
+    runtime: python
+    buildCommand: bash build.sh
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: NODE_VERSION
+        value: "20"
+    healthCheckPath: /health
