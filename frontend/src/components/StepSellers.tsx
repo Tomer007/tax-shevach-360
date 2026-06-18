@@ -40,7 +40,8 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
     setEditIdx(null)
   }
 
-  const canContinue = sellers.length > 0 && sellers.every((s) => s.name && s.birth_date)
+  // Only require name to proceed (birth_date optional for companies)
+  const canContinue = sellers.length > 0 && sellers.every((s) => s.name)
 
   // If no sellers yet, start with one
   if (sellers.length === 0) {
