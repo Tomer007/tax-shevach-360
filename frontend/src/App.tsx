@@ -3,6 +3,7 @@ import { calculateTax } from './api'
 import type { CalculationResult, TransactionInput } from './types'
 import { MOCK_TRANSACTION } from './mockData'
 import LoginPage from './components/LoginPage'
+import UploadContract from './components/UploadContract'
 import StepSale from './components/StepSale'
 import StepSellers from './components/StepSellers'
 import StepAcquisition from './components/StepAcquisition'
@@ -157,6 +158,9 @@ export default function App() {
           התנתק
         </button>
       </header>
+
+      {/* Upload contract + Steps */}
+      <UploadContract token={token} onDataExtracted={updateForm} />
 
       {/* Steps indicator */}
       <nav className="steps" aria-label="שלבי הטופס">
