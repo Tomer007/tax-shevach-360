@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { calculateTax } from './api'
 import type { CalculationResult, TransactionInput } from './types'
 import { MOCK_TRANSACTION } from './mockData'
+import LoginPage from './components/LoginPage'
 import StepSale from './components/StepSale'
 import StepSellers from './components/StepSellers'
 import StepAcquisition from './components/StepAcquisition'
@@ -20,6 +21,9 @@ const STEPS = [
 type StepKey = (typeof STEPS)[number]['key']
 
 export default function App() {
+  const [token, setToken] = useState<string | null>(
+    () => sessionStorage.getItem('token')
+  )
   const [currentStep, setCurrentStep] = useState<StepKey>('sale')
   const [formData, setFormData] = useState<Partial<TransactionInput>>({
     sale_currency: 'ILS',
@@ -64,6 +68,21 @@ export default function App() {
   }
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep)
+
+  function handleLogin(newToken: string) {
+    sessionStorage.setItem('token', newToken)
+    setToken(newToken)
+  }
+
+  function handleLogout() {
+    sessionStorage.removeItem('token')
+    setToken(null)
+  }
+
+  // Gate: show login if not authenticated
+  if (!token) {
+    return <LoginPage onLogin={handleLogin} />
+  }
 
   function updateForm(partial: Partial<TransactionInput>) {
     setFormData((prev) => ({ ...prev, ...partial }))
@@ -129,11 +148,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
+      <header className="app-header" style={{ position: 'relative' }}>
         <h1 onClick={handleTitleClick} style={{ cursor: 'pointer', userSelect: 'none' }}>
           מס שבח 360
         </h1>
         <p>מחשבון מס שבח מקרקעין</p>
+        <button className="btn btn-secondary btn-sm" onClick={handleLogout} type="button" style={{ position: 'absolute', top: 12, left: 12 }}>
+          התנתק
+        </button>
       </header>
 
       {/* Steps indicator */}
