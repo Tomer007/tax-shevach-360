@@ -58,7 +58,7 @@ class ParsedContract(BaseModel):
 
     sale_date: str | None = None
     sale_amount: float | None = None
-    sale_currency: str = "ILS"
+    sale_currency: str | None = "ILS"
     sellers: list[dict] = []
     acquisitions: list[dict] = []
     property_address: str | None = None
@@ -102,9 +102,9 @@ def parse_contract_text(text: str) -> ParsedContract:
     return ParsedContract(
         sale_date=data.get("sale_date"),
         sale_amount=data.get("sale_amount"),
-        sale_currency=data.get("sale_currency", "ILS"),
-        sellers=data.get("sellers", []),
-        acquisitions=data.get("acquisitions", []),
+        sale_currency=data.get("sale_currency") or "ILS",
+        sellers=data.get("sellers") or [],
+        acquisitions=data.get("acquisitions") or [],
         property_address=data.get("property_address"),
         block_parcel=data.get("block_parcel"),
         notes=data.get("notes"),
