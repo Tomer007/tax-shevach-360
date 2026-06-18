@@ -58,16 +58,18 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
           </div>
           <div className="form-grid">
             <div className="form-group">
-              <label>תאריך רכישה</label>
+              <label htmlFor={`acq-date-${idx}`}>תאריך רכישה</label>
               <input
+                id={`acq-date-${idx}`}
                 type="date"
                 value={acq.acquisition_date}
                 onChange={(e) => updateAcq(idx, { acquisition_date: e.target.value })}
               />
             </div>
             <div className="form-group">
-              <label>אופן הרכישה</label>
+              <label htmlFor={`acq-type-${idx}`}>אופן הרכישה</label>
               <select
+                id={`acq-type-${idx}`}
                 value={acq.acquisition_type}
                 onChange={(e) => updateAcq(idx, { acquisition_type: e.target.value as AcquisitionType })}
               >
@@ -78,8 +80,9 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
               </select>
             </div>
             <div className="form-group">
-              <label>סכום הרכישה</label>
+              <label htmlFor={`acq-amount-${idx}`}>סכום הרכישה</label>
               <input
+                id={`acq-amount-${idx}`}
                 type="number"
                 min={0}
                 value={acq.amount || ''}
@@ -88,8 +91,9 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
               />
             </div>
             <div className="form-group">
-              <label>מטבע</label>
+              <label htmlFor={`acq-currency-${idx}`}>מטבע</label>
               <select
+                id={`acq-currency-${idx}`}
                 value={acq.currency}
                 onChange={(e) => updateAcq(idx, { currency: e.target.value as Currency })}
               >
@@ -102,8 +106,9 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
               </select>
             </div>
             <div className="form-group">
-              <label>חלק שנרכש (%)</label>
+              <label htmlFor={`acq-share-${idx}`}>חלק שנרכש (%)</label>
               <input
+                id={`acq-share-${idx}`}
                 type="number"
                 min={0}
                 max={100}

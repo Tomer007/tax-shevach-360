@@ -154,6 +154,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
       <header className="app-header" style={{ position: 'relative' }}>
         <h1 onClick={handleTitleClick} style={{ cursor: 'pointer', userSelect: 'none' }}>
           מס שבח 360
@@ -168,7 +169,7 @@ export default function App() {
       <UploadContract token={token} onDataExtracted={updateForm} />
 
       {/* Steps indicator */}
-      <nav className="steps" aria-label="שלבי הטופס">
+      <nav className="steps" aria-label="שלבי הטופס" id="main-content">
         {STEPS.map((step, i) => {
           const isActive = i === currentStepIndex
           const isCompleted = i < currentStepIndex

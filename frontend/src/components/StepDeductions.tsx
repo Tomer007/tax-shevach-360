@@ -49,8 +49,9 @@ export default function StepDeductions({ formData, updateForm, onNext, onPrev }:
         <h4 style={{ fontSize: '0.95rem', marginBottom: 12 }}>פחת</h4>
         <div className="form-grid">
           <div className="form-group">
-            <label>שיטת חישוב</label>
+            <label htmlFor={`dep-mode`}>שיטת חישוב</label>
             <select
+              id="dep-mode"
               value={depreciation.mode}
               onChange={(e) => updateDepreciation({ mode: e.target.value as 'manual' | 'auto' })}
             >
@@ -60,8 +61,9 @@ export default function StepDeductions({ formData, updateForm, onNext, onPrev }:
           </div>
           {depreciation.mode === 'manual' && (
             <div className="form-group">
-              <label>סכום פחת (₪)</label>
+              <label htmlFor="dep-amount">סכום פחת (₪)</label>
               <input
+                id="dep-amount"
                 type="number"
                 min={0}
                 value={depreciation.manual_amount || ''}
@@ -86,8 +88,9 @@ export default function StepDeductions({ formData, updateForm, onNext, onPrev }:
           </div>
           <div className="form-grid cols-3">
             <div className="form-group">
-              <label>תיאור</label>
+              <label htmlFor={`ded-desc-${idx}`}>תיאור</label>
               <input
+                id={`ded-desc-${idx}`}
                 type="text"
                 value={ded.description}
                 onChange={(e) => updateDed(idx, { description: e.target.value })}
@@ -96,8 +99,9 @@ export default function StepDeductions({ formData, updateForm, onNext, onPrev }:
               />
             </div>
             <div className="form-group">
-              <label>סכום</label>
+              <label htmlFor={`ded-amount-${idx}`}>סכום</label>
               <input
+                id={`ded-amount-${idx}`}
                 type="number"
                 min={0}
                 value={ded.amount || ''}
@@ -105,16 +109,18 @@ export default function StepDeductions({ formData, updateForm, onNext, onPrev }:
               />
             </div>
             <div className="form-group">
-              <label>תאריך</label>
+              <label htmlFor={`ded-date-${idx}`}>תאריך</label>
               <input
+                id={`ded-date-${idx}`}
                 type="date"
                 value={ded.deduction_date}
                 onChange={(e) => updateDed(idx, { deduction_date: e.target.value })}
               />
             </div>
             <div className="form-group">
-              <label>מטבע</label>
+              <label htmlFor={`ded-currency-${idx}`}>מטבע</label>
               <select
+                id={`ded-currency-${idx}`}
                 value={ded.currency}
                 onChange={(e) => updateDed(idx, { currency: e.target.value as Currency })}
               >

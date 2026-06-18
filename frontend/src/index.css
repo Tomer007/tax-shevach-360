@@ -60,6 +60,27 @@ body {
   }
 }
 
+/* Skip link for keyboard accessibility */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 9999;
+  transition: top var(--duration-fast);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
 /* App */
 .app {
   max-width: 860px;
@@ -207,7 +228,8 @@ body {
 
 .form-group input:focus,
 .form-group select:focus {
-  outline: none;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
   border-color: var(--primary);
   background: rgba(99, 102, 241, 0.05);
   box-shadow: 0 0 0 3px var(--primary-glow);
@@ -786,7 +808,8 @@ body {
 }
 
 .login-field input:focus {
-  outline: none;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
   border-color: var(--primary);
   background: rgba(99, 102, 241, 0.05);
   box-shadow: 0 0 0 4px var(--primary-glow);
