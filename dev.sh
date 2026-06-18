@@ -10,7 +10,7 @@ echo "📦 Backend (FastAPI) → http://localhost:8000"
 cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000 &
 
 # Frontend
-echo "⚛️  Frontend (Vite)   → http://localhost:3000"
+echo "⚛️  Frontend (Vite)   → http://localhost:5173"
 cd frontend && npm run dev &
 
 wait
