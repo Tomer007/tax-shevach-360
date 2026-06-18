@@ -61,33 +61,42 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       // Show extracted results
       setExtractedData(data)
 
-      // Map extracted data to form format
+      // Map extracted data to form format - fill ALL available fields
       const partial: Partial<TransactionInput> = {}
+      
+      // Sale details
       if (data.sale_date) partial.sale_date = data.sale_date
-      if (data.sale_amount) partial.sale_amount = data.sale_amount
+      if (data.sale_amount) partial.sale_amount = Number(data.sale_amount)
       if (data.sale_currency) partial.sale_currency = data.sale_currency
+      
+      // Sellers
       if (data.sellers?.length) {
         partial.sellers = data.sellers.map((s: Record<string, unknown>) => ({
-          name: s.name || '',
-          id_number: s.id_number || '',
-          birth_date: s.birth_date || '',
-          share_percent: s.share_percent || 100,
-          is_israeli_resident: s.is_israeli_resident ?? true,
+          name: String(s.name || ''),
+          id_number: String(s.id_number || ''),
+          birth_date: String(s.birth_date || ''),
+          share_percent: Number(s.share_percent) || 100,
+          is_israeli_resident: s.is_israeli_resident !== false,
           marital_status: 'single',
           annual_incomes: {},
           prisa_max_years: [],
         }))
       }
+      
+      // Acquisitions
       if (data.acquisitions?.length) {
         partial.acquisitions = data.acquisitions.map((a: Record<string, unknown>) => ({
-          acquisition_date: a.acquisition_date || '',
-          acquisition_type: a.acquisition_type || 'purchase',
-          amount: a.amount || 0,
-          currency: a.currency || 'ILS',
-          share_percent: a.share_percent || 100,
+          acquisition_date: String(a.acquisition_date || ''),
+          acquisition_type: String(a.acquisition_type || 'purchase'),
+          amount: Number(a.amount) || 0,
+          currency: String(a.currency || 'ILS'),
+          share_percent: Number(a.share_percent) || 100,
           deceased_eligible_for_exemption: false,
         }))
       }
+
+      // Property type (always residential for contracts)
+      partial.is_residential = true
 
       onDataExtracted(partial)
     } catch (err: unknown) {

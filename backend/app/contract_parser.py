@@ -15,39 +15,53 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 EXTRACTION_PROMPT = """You are a legal document parser specializing in Israeli real estate contracts (חוזה מכר מקרקעין).
 
+This is a TAX CALCULATOR app. We need to extract details for capital gains tax (מס שבח) calculation.
+
 Extract the following transaction details from the document. Return a JSON object with these fields (use null for missing data):
 
 {
-  "sale_date": "YYYY-MM-DD",
-  "sale_amount": number (in ILS),
+  "sale_date": "YYYY-MM-DD (date of the contract/sale agreement)",
+  "sale_amount": number (total transaction price in ILS - the מחיר/תמורה),
   "sale_currency": "ILS" | "USD" | "EUR",
   "sellers": [
     {
-      "name": "full name in Hebrew",
-      "id_number": "9-digit ID",
+      "name": "full name of the SELLER (מוכר) in Hebrew",
+      "id_number": "ID number (ת.ז. or ח.פ.)",
       "birth_date": "YYYY-MM-DD" or null,
       "share_percent": number (0-100),
       "is_israeli_resident": true/false
     }
   ],
+  "buyers": [
+    {
+      "name": "full name of the BUYER (רוכש/קונה)",
+      "id_number": "ID number"
+    }
+  ],
   "acquisitions": [
     {
-      "acquisition_date": "YYYY-MM-DD",
+      "acquisition_date": "YYYY-MM-DD (when the seller originally acquired the property, if mentioned)",
       "acquisition_type": "purchase" | "inheritance" | "gift" | "divorce",
-      "amount": number,
+      "amount": number (original purchase price the seller paid, if mentioned),
       "currency": "ILS" | "USD" | "EUR" | "ILP" | "ILR",
       "share_percent": number
     }
   ],
-  "property_address": "full address",
+  "property_address": "full address of the property",
   "block_parcel": "גוש/חלקה if available",
-  "notes": "any other relevant information"
+  "property_type": "apartment" | "house" | "land" | "commercial" | "other",
+  "payment_schedule": "summary of payment terms if available",
+  "notes": "any other relevant information for tax calculation"
 }
 
 Rules:
+- sale_date: The date the contract was signed
+- sale_amount: The TOTAL price (תמורה/מחיר) in the contract. This is critical - look for the full amount
+- sellers: The party SELLING the property (מוכר). May be a person or company (חברה/בע"מ)
+- buyers: The party BUYING (רוכש/קונה)
 - Dates must be in YYYY-MM-DD format
 - Amounts should be numbers without commas or currency symbols
-- If the contract mentions the original purchase price, include it in acquisitions
+- If the contract mentions when the seller originally bought the property, include it in acquisitions
 - Identify all sellers/buyers and their ownership shares
 - Default share to 100% if only one seller
 - If currency is not specified, assume ILS
