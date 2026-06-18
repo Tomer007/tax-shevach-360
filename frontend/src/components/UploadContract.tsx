@@ -88,25 +88,18 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     if (!extractedData) return []
     const missing: MissingField[] = []
 
-    // Only flag truly missing fields — these are fields the user MUST fill manually
+    // Only flag fields the user needs to be aware they must fill
     if (!extractedData.sellers?.length) {
       missing.push({ field: 'sellers', label: 'פרטי מוכרים', critical: true })
     } else {
-      // birth_date is typically not in sale contracts
       const hasBirthDate = extractedData.sellers.some(s => s.birth_date)
       if (!hasBirthDate) {
         missing.push({ field: 'birth_date', label: 'תאריך לידה (מוכרים)', critical: false })
       }
     }
 
-    // Acquisition amount (original purchase price) is NOT in the sale contract — user must provide
-    if (extractedData.acquisitions?.length) {
-      const hasAmount = extractedData.acquisitions.some(a => a.amount != null && a.amount > 0)
-      if (!hasAmount) {
-        missing.push({ field: 'acquisition_amount', label: 'סכום רכישה מקורי (לא מופיע בחוזה מכר)', critical: true })
-      }
-    } else {
-      missing.push({ field: 'acquisitions', label: 'תאריך רכישה מקורי', critical: true })
+    if (!extractedData.acquisitions?.length) {
+      missing.push({ field: 'acquisitions', label: 'תאריך רכישה מקורי', critical: false })
     }
 
     return missing
