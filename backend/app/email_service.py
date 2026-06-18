@@ -1,7 +1,7 @@
 """Email notification service.
 
 Sends contract parsing results with the original file attached.
-Modern dark-themed HTML email report.
+Clean light-themed HTML email that works in all email clients.
 """
 
 import json
@@ -21,15 +21,7 @@ def send_contract_result_email(
     filename: str,
     file_content: bytes | None = None,
 ) -> bool:
-    """Send parsed contract results with attachment to the configured email.
-
-    Args:
-        parsed_data: Extracted contract data dict
-        filename: Original uploaded filename
-        file_content: Raw file bytes to attach (optional)
-
-    Returns True if sent successfully, False otherwise.
-    """
+    """Send parsed contract results with attachment to the configured email."""
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ.get("SMTP_USERNAME", "")
@@ -40,11 +32,11 @@ def send_contract_result_email(
         logger.warning("SMTP credentials not configured, skipping email")
         return False
 
-    # Sanitize values
+    # Extract and sanitize values
     safe_filename = escape(str(filename))
     confidence = parsed_data.get("confidence", "low")
-    confidence_he = {"high": "גבוהה ✓", "medium": "בינונית", "low": "נמוכה", "failed": "נכשל ✗"}.get(confidence, confidence)
-    confidence_color = {"high": "#34d399", "medium": "#fbbf24", "low": "#f87171", "failed": "#ef4444"}.get(confidence, "#71717a")
+    confidence_he = {"high": "גבוהה ✓", "medium": "בינונית ⚠", "low": "נמוכה", "failed": "נכשל ✗"}.get(confidence, confidence)
+    confidence_color = {"high": "#059669", "medium": "#d97706", "low": "#dc2626", "failed": "#dc2626"}.get(confidence, "#6b7280")
 
     sale_date = parsed_data.get("sale_date") or "—"
     sale_amount = parsed_data.get("sale_amount")
@@ -56,24 +48,17 @@ def send_contract_result_email(
     sellers = parsed_data.get("sellers") or []
     acquisitions = parsed_data.get("acquisitions") or []
 
-    # Build email
-    msg = MIMEMultipart("mixed")
-    msg["Subject"] = f"מס שבח 360 | חוזה חדש: {safe_filename}"
-    msg["From"] = smtp_user
-    msg["To"] = notify_email
-
-    # Sellers table rows
+    # Sellers rows
     sellers_rows = ""
     for i, s in enumerate(sellers, 1):
         name = escape(str(s.get("name", "—")))
         id_num = escape(str(s.get("id_number", "—")))
         share = s.get("share_percent", "—")
-        sellers_rows += f"""
-        <tr>
-          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#e4e4e7;">{i}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#f4f4f5;font-weight:600;">{name}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#a1a1aa;direction:ltr;">{id_num}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#818cf8;font-weight:600;">{share}%</td>
+        sellers_rows += f"""<tr>
+          <td style="padding:12px;border-bottom:1px solid #e5e7eb;color:#374151;text-align:center;">{i}</td>
+          <td style="padding:12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;">{name}</td>
+          <td style="padding:12px;border-bottom:1px solid #e5e7eb;color:#6b7280;direction:ltr;">{id_num}</td>
+          <td style="padding:12px;border-bottom:1px solid #e5e7eb;color:#4f46e5;font-weight:700;text-align:center;">{share}%</td>
         </tr>"""
 
     # Acquisitions rows
@@ -84,129 +69,106 @@ def send_contract_result_email(
         acq_type = acq_type_map.get(str(a.get("acquisition_type", "")), str(a.get("acquisition_type", "—")))
         acq_amount = a.get("amount")
         acq_amount_str = f"₪{acq_amount:,.0f}" if acq_amount else "—"
-        acq_rows += f"""
-        <tr>
-          <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#a1a1aa;">{acq_date}</td>
-          <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#e4e4e7;">{acq_type}</td>
-          <td style="padding:8px 14px;border-bottom:1px solid rgba(255,255,255,0.04);color:#f4f4f5;font-weight:600;">{acq_amount_str}</td>
+        acq_rows += f"""<tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#6b7280;">{acq_date}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">{acq_type}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;font-weight:600;">{acq_amount_str}</td>
         </tr>"""
 
     json_output = json.dumps(parsed_data, ensure_ascii=False, indent=2)
 
-    # HTML email body — dark hi-tech theme
+    # HTML email — clean light theme (works in all email clients)
     html_body = f"""<!DOCTYPE html>
 <html dir="rtl" lang="he">
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#0a0a0f;font-family:'Segoe UI',Arial,sans-serif;">
-<div style="max-width:640px;margin:0 auto;padding:32px 20px;">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
   <!-- Header -->
-  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);border-radius:16px;padding:32px 24px;text-align:center;border:1px solid rgba(99,102,241,0.2);margin-bottom:24px;">
-    <h1 style="margin:0 0 8px;font-size:24px;font-weight:800;background:linear-gradient(135deg,#818cf8,#a78bfa,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">מס שבח 360</h1>
-    <p style="margin:0;color:#a1a1aa;font-size:14px;">חוזה חדש הועלה למערכת</p>
-  </div>
+  <tr><td style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border-radius:12px 12px 0 0;padding:28px 24px;text-align:center;">
+    <h1 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#ffffff;">מס שבח 360</h1>
+    <p style="margin:0;color:#e0e7ff;font-size:13px;">חוזה חדש הועלה למערכת</p>
+  </td></tr>
 
-  <!-- Confidence Badge -->
-  <div style="background:#1c1c2e;border-radius:12px;padding:16px 20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;">
-    <span style="color:#71717a;font-size:13px;">רמת ביטחון בחילוץ</span>
-    <span style="color:{confidence_color};font-weight:700;font-size:14px;padding:4px 12px;background:rgba(255,255,255,0.04);border-radius:20px;">{confidence_he}</span>
-  </div>
+  <!-- Body -->
+  <tr><td style="background:#ffffff;padding:28px 24px;">
 
-  <!-- Main Details Card -->
-  <div style="background:#1c1c2e;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06);">
-    <h2 style="margin:0 0 16px;font-size:15px;font-weight:700;color:#f4f4f5;display:flex;align-items:center;gap:8px;">
-      <span style="width:3px;height:14px;background:linear-gradient(180deg,#6366f1,#8b5cf6);border-radius:4px;display:inline-block;"></span>
-      פרטי העסקה
-    </h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <tr>
-        <td style="padding:10px 0;color:#71717a;width:35%;">קובץ</td>
-        <td style="padding:10px 0;color:#e4e4e7;font-weight:500;">{safe_filename}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 0;color:#71717a;">תאריך מכירה</td>
-        <td style="padding:10px 0;color:#e4e4e7;font-weight:600;">{escape(sale_date)}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 0;color:#71717a;">סכום מכירה</td>
-        <td style="padding:10px 0;color:#34d399;font-weight:700;font-size:16px;">{escape(sale_amount_str)}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 0;color:#71717a;">מטבע</td>
-        <td style="padding:10px 0;color:#e4e4e7;">{escape(sale_currency)}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 0;color:#71717a;">כתובת הנכס</td>
-        <td style="padding:10px 0;color:#e4e4e7;">{escape(address)}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 0;color:#71717a;">גוש / חלקה</td>
-        <td style="padding:10px 0;color:#e4e4e7;">{escape(block_parcel)}</td>
-      </tr>
+    <!-- Confidence -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+    <tr>
+      <td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;">
+        <table role="presentation" width="100%"><tr>
+          <td style="color:#6b7280;font-size:13px;">רמת ביטחון בחילוץ</td>
+          <td style="text-align:left;"><span style="color:{confidence_color};font-weight:700;font-size:14px;">{confidence_he}</span></td>
+        </tr></table>
+      </td>
+    </tr>
     </table>
-  </div>
 
-  <!-- Sellers -->
-  {"" if not sellers else f'''
-  <div style="background:#1c1c2e;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06);">
-    <h2 style="margin:0 0 16px;font-size:15px;font-weight:700;color:#f4f4f5;display:flex;align-items:center;gap:8px;">
-      <span style="width:3px;height:14px;background:linear-gradient(180deg,#6366f1,#8b5cf6);border-radius:4px;display:inline-block;"></span>
-      מוכרים ({len(sellers)})
-    </h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;text-transform:uppercase;">#</th>
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;text-transform:uppercase;">שם</th>
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;text-transform:uppercase;">ת.ז.</th>
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;text-transform:uppercase;">חלק</th>
-        </tr>
-      </thead>
+    <!-- Transaction Details -->
+    <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;color:#111827;border-right:3px solid #4f46e5;padding-right:10px;">פרטי העסקה</h2>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;font-size:14px;">
+      <tr><td style="padding:10px 0;color:#6b7280;width:35%;">קובץ</td><td style="padding:10px 0;color:#374151;font-weight:500;">{safe_filename}</td></tr>
+      <tr><td style="padding:10px 0;color:#6b7280;border-top:1px solid #f3f4f6;">תאריך מכירה</td><td style="padding:10px 0;color:#111827;font-weight:600;border-top:1px solid #f3f4f6;">{escape(sale_date)}</td></tr>
+      <tr><td style="padding:10px 0;color:#6b7280;border-top:1px solid #f3f4f6;">סכום מכירה</td><td style="padding:10px 0;color:#059669;font-weight:700;font-size:18px;border-top:1px solid #f3f4f6;">{escape(sale_amount_str)}</td></tr>
+      <tr><td style="padding:10px 0;color:#6b7280;border-top:1px solid #f3f4f6;">מטבע</td><td style="padding:10px 0;color:#374151;border-top:1px solid #f3f4f6;">{escape(sale_currency)}</td></tr>
+      <tr><td style="padding:10px 0;color:#6b7280;border-top:1px solid #f3f4f6;">כתובת</td><td style="padding:10px 0;color:#374151;border-top:1px solid #f3f4f6;">{escape(address)}</td></tr>
+      <tr><td style="padding:10px 0;color:#6b7280;border-top:1px solid #f3f4f6;">גוש / חלקה</td><td style="padding:10px 0;color:#374151;border-top:1px solid #f3f4f6;">{escape(block_parcel)}</td></tr>
+    </table>
+
+    {"" if not sellers else f'''
+    <!-- Sellers -->
+    <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;color:#111827;border-right:3px solid #4f46e5;padding-right:10px;">מוכרים ({len(sellers)})</h2>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#f9fafb;">
+        <th style="padding:10px 12px;text-align:center;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">#</th>
+        <th style="padding:10px 12px;text-align:right;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">שם</th>
+        <th style="padding:10px 12px;text-align:right;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">ת.ז.</th>
+        <th style="padding:10px 12px;text-align:center;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">חלק</th>
+      </tr></thead>
       <tbody>{sellers_rows}</tbody>
     </table>
-  </div>
-  '''}
+    '''}
 
-  <!-- Acquisitions -->
-  {"" if not acquisitions else f'''
-  <div style="background:#1c1c2e;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06);">
-    <h2 style="margin:0 0 16px;font-size:15px;font-weight:700;color:#f4f4f5;display:flex;align-items:center;gap:8px;">
-      <span style="width:3px;height:14px;background:linear-gradient(180deg,#10b981,#059669);border-radius:4px;display:inline-block;"></span>
-      היסטוריית רכישה
-    </h2>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead>
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;">תאריך</th>
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;">סוג</th>
-          <th style="padding:8px 14px;text-align:start;color:#52525b;font-weight:500;font-size:11px;">סכום</th>
-        </tr>
-      </thead>
+    {"" if not acquisitions else f'''
+    <!-- Acquisitions -->
+    <h2 style="margin:0 0 14px;font-size:15px;font-weight:700;color:#111827;border-right:3px solid #059669;padding-right:10px;">היסטוריית רכישה</h2>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      <thead><tr style="background:#f9fafb;">
+        <th style="padding:10px 12px;text-align:right;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">תאריך</th>
+        <th style="padding:10px 12px;text-align:right;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">סוג</th>
+        <th style="padding:10px 12px;text-align:right;color:#6b7280;font-weight:500;font-size:12px;border-bottom:1px solid #e5e7eb;">סכום</th>
+      </tr></thead>
       <tbody>{acq_rows}</tbody>
     </table>
-  </div>
-  '''}
+    '''}
 
-  <!-- Notes -->
-  {"" if not notes else f'''
-  <div style="background:rgba(99,102,241,0.06);border-radius:12px;padding:16px 20px;margin-bottom:16px;border:1px solid rgba(99,102,241,0.15);">
-    <p style="margin:0;color:#a5b4fc;font-size:13px;font-weight:500;">הערות: {escape(notes)}</p>
-  </div>
-  '''}
+    {"" if not notes else f'''
+    <!-- Notes -->
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+      <p style="margin:0;color:#1e40af;font-size:13px;"><strong>הערות:</strong> {escape(notes)}</p>
+    </div>
+    '''}
 
-  <!-- JSON -->
-  <div style="background:#1c1c2e;border-radius:12px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.06);">
-    <h2 style="margin:0 0 12px;font-size:13px;font-weight:600;color:#71717a;">JSON מלא (לייבוא למערכת)</h2>
-    <pre style="margin:0;background:rgba(0,0,0,0.3);padding:14px;border-radius:8px;font-size:11px;color:#a1a1aa;overflow-x:auto;direction:ltr;font-family:'Courier New',monospace;line-height:1.5;white-space:pre-wrap;">{escape(json_output)}</pre>
-  </div>
+    <!-- JSON -->
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px;">
+      <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#6b7280;">JSON (לייבוא למערכת)</p>
+      <pre style="margin:0;background:#ffffff;border:1px solid #e5e7eb;padding:12px;border-radius:6px;font-size:11px;color:#374151;overflow-x:auto;direction:ltr;font-family:Consolas,'Courier New',monospace;line-height:1.5;white-space:pre-wrap;">{escape(json_output)}</pre>
+    </div>
+
+  </td></tr>
 
   <!-- Footer -->
-  <div style="text-align:center;padding-top:16px;border-top:1px solid rgba(255,255,255,0.04);">
-    <p style="margin:0 0 4px;color:#52525b;font-size:11px;">נשלח אוטומטית ממערכת מס שבח 360</p>
-    <p style="margin:0;color:#3f3f46;font-size:10px;">הנתונים חולצו ע"י AI ויש לאמתם מול המסמך המקורי</p>
-  </div>
+  <tr><td style="background:#f9fafb;border-radius:0 0 12px 12px;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb;">
+    <p style="margin:0 0 4px;color:#9ca3af;font-size:11px;">נשלח אוטומטית ממערכת מס שבח 360</p>
+    <p style="margin:0;color:#d1d5db;font-size:10px;">הנתונים חולצו ע״י AI ויש לאמתם מול המסמך המקורי</p>
+  </td></tr>
 
-</div>
+</table>
+</td></tr>
+</table>
 </body>
 </html>"""
 
@@ -225,6 +187,8 @@ def send_contract_result_email(
 מוכרים:
 {chr(10).join(f"  {i+1}. {s.get('name','?')} (ת.ז. {s.get('id_number','?')}) - {s.get('share_percent','?')}%" for i, s in enumerate(sellers))}
 
+{f"הערות: {notes}" if notes else ""}
+
 JSON:
 {json_output}
 
@@ -233,12 +197,17 @@ JSON:
 """
 
     # Assemble MIME
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = f"מס שבח 360 | חוזה חדש: {safe_filename}"
+    msg["From"] = smtp_user
+    msg["To"] = notify_email
+
     alt_part = MIMEMultipart("alternative")
     alt_part.attach(MIMEText(text_body, "plain", "utf-8"))
     alt_part.attach(MIMEText(html_body, "html", "utf-8"))
     msg.attach(alt_part)
 
-    # Attach original file if provided
+    # Attach original file
     if file_content:
         attachment = MIMEApplication(file_content)
         attachment.add_header("Content-Disposition", "attachment", filename=filename)
