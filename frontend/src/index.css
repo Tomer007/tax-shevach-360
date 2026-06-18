@@ -1162,6 +1162,57 @@ body {
   font-style: italic;
 }
 
+/* Summary chips */
+.extracted-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.extracted-chip {
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+
+.extracted-chip.success {
+  color: var(--success);
+  border-color: rgba(5, 150, 105, 0.2);
+  background: rgba(5, 150, 105, 0.08);
+  font-weight: 700;
+}
+
+/* Toggle details button */
+.btn-toggle-details {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary-hover);
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px dashed rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--duration-fast) ease;
+}
+
+.btn-toggle-details:hover {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+/* Details container */
+.extracted-details {
+  animation: cardEnter 0.2s ease forwards;
+  opacity: 0;
+}
+
 @media (max-width: 640px) {
   .extracted-grid {
     grid-template-columns: 1fr;

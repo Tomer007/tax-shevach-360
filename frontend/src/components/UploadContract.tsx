@@ -36,6 +36,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
   const [error, setError] = useState('')
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [approved, setApproved] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
@@ -60,6 +61,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     setError('')
     setExtractedData(null)
     setApproved(false)
+    setShowDetails(false)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -86,27 +88,25 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     if (!extractedData) return []
     const missing: MissingField[] = []
 
-    if (!extractedData.sale_date) {
-      missing.push({ field: 'sale_date', label: 'תאריך מכירה', critical: true })
-    }
-    if (!extractedData.sale_amount) {
-      missing.push({ field: 'sale_amount', label: 'סכום מכירה', critical: true })
-    }
+    // Only flag truly missing fields — these are fields the user MUST fill manually
     if (!extractedData.sellers?.length) {
       missing.push({ field: 'sellers', label: 'פרטי מוכרים', critical: true })
     } else {
+      // birth_date is typically not in sale contracts
       const hasBirthDate = extractedData.sellers.some(s => s.birth_date)
       if (!hasBirthDate) {
         missing.push({ field: 'birth_date', label: 'תאריך לידה (מוכרים)', critical: false })
       }
     }
-    if (!extractedData.acquisitions?.length) {
-      missing.push({ field: 'acquisitions', label: 'פרטי רכישה מקורית', critical: true })
-    } else {
-      const hasAmount = extractedData.acquisitions.some(a => a.amount && a.amount > 0)
+
+    // Acquisition amount (original purchase price) is NOT in the sale contract — user must provide
+    if (extractedData.acquisitions?.length) {
+      const hasAmount = extractedData.acquisitions.some(a => a.amount != null && a.amount > 0)
       if (!hasAmount) {
-        missing.push({ field: 'acquisition_amount', label: 'סכום רכישה מקורי', critical: true })
+        missing.push({ field: 'acquisition_amount', label: 'סכום רכישה מקורי (לא מופיע בחוזה מכר)', critical: true })
       }
+    } else {
+      missing.push({ field: 'acquisitions', label: 'תאריך רכישה מקורי', critical: true })
     }
 
     return missing
@@ -160,6 +160,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
   function handleDismiss() {
     setExtractedData(null)
     setApproved(false)
+    setShowDetails(false)
   }
 
   const confidenceLabel = (c: string) =>
@@ -211,7 +212,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
         {error && <span className="upload-error">{error}</span>}
       </div>
 
-      {/* Extracted Results Panel - Review Before Approve */}
+      {/* Extracted Results Panel */}
       {extractedData && (
         <div className="extracted-results" role="region" aria-label="נתונים שחולצו מהחוזה">
           <div className="extracted-header">
@@ -221,11 +222,20 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
             </div>
           </div>
 
+          {/* Quick summary - always visible */}
+          <div className="extracted-summary">
+            {extractedData.sale_date && <span className="extracted-chip">📅 {extractedData.sale_date}</span>}
+            {extractedData.sale_amount && <span className="extracted-chip success">💰 ₪{extractedData.sale_amount.toLocaleString()}</span>}
+            {extractedData.sellers.length > 0 && <span className="extracted-chip">👤 {extractedData.sellers.length} מוכרים</span>}
+            {extractedData.buyers && extractedData.buyers.length > 0 && <span className="extracted-chip">🏠 {extractedData.buyers.length} קונים</span>}
+            {extractedData.property_address && <span className="extracted-chip">📍 {extractedData.property_address}</span>}
+          </div>
+
           {/* Missing Fields Warning */}
           {missingFields.length > 0 && !approved && (
             <div className="extracted-missing" role="alert">
               <div className="extracted-missing-header">
-                ⚠️ שדות חסרים — יש למלא ידנית בטופס:
+                ⚠️ שדות שיש למלא ידנית בטופס:
               </div>
               {criticalMissing.length > 0 && (
                 <ul className="extracted-missing-list critical">
@@ -250,97 +260,117 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
             </div>
           )}
 
-          {/* Sale Details */}
-          <div className="extracted-grid">
-            {extractedData.sale_date && (
-              <div className="extracted-item">
-                <span className="extracted-label">תאריך מכירה</span>
-                <span className="extracted-value">{extractedData.sale_date}</span>
-              </div>
-            )}
-            {extractedData.sale_amount && (
-              <div className="extracted-item">
-                <span className="extracted-label">סכום מכירה</span>
-                <span className="extracted-value extracted-amount">₪{extractedData.sale_amount.toLocaleString()}</span>
-              </div>
-            )}
-            {extractedData.property_type && (
-              <div className="extracted-item">
-                <span className="extracted-label">סוג נכס</span>
-                <span className="extracted-value">{propertyTypeLabel(extractedData.property_type)}</span>
-              </div>
-            )}
-            {extractedData.property_address && (
-              <div className="extracted-item full">
-                <span className="extracted-label">כתובת</span>
-                <span className="extracted-value">{extractedData.property_address}</span>
-              </div>
-            )}
-            {extractedData.block_parcel && (
-              <div className="extracted-item">
-                <span className="extracted-label">גוש/חלקה</span>
-                <span className="extracted-value">{extractedData.block_parcel}</span>
-              </div>
-            )}
-          </div>
+          {/* Toggle Details Button */}
+          <button
+            className="btn-toggle-details"
+            onClick={() => setShowDetails(!showDetails)}
+            type="button"
+          >
+            {showDetails ? '▲ הסתר פרטים' : '▼ הצג את כל השדות שחולצו'}
+          </button>
 
-          {/* Sellers */}
-          {extractedData.sellers.length > 0 && (
-            <div className="extracted-section">
-              <span className="extracted-section-title">מוכרים ({extractedData.sellers.length})</span>
-              {extractedData.sellers.map((s, i) => (
-                <div key={i} className="extracted-seller">
-                  <span>{s.name || '—'}</span>
-                  <span className="extracted-dim">ת״ז {s.id_number || '—'}</span>
-                  <span className="extracted-badge-sm">{s.share_percent || 100}%</span>
-                  {!s.birth_date && <span className="missing-inline">חסר: ת. לידה</span>}
+          {/* Detailed Fields - collapsible */}
+          {showDetails && (
+            <div className="extracted-details">
+              {/* Sale Details */}
+              <div className="extracted-grid">
+                {extractedData.sale_date && (
+                  <div className="extracted-item">
+                    <span className="extracted-label">תאריך מכירה</span>
+                    <span className="extracted-value">{extractedData.sale_date}</span>
+                  </div>
+                )}
+                {extractedData.sale_amount && (
+                  <div className="extracted-item">
+                    <span className="extracted-label">סכום מכירה</span>
+                    <span className="extracted-value extracted-amount">₪{extractedData.sale_amount.toLocaleString()}</span>
+                  </div>
+                )}
+                {extractedData.property_type && (
+                  <div className="extracted-item">
+                    <span className="extracted-label">סוג נכס</span>
+                    <span className="extracted-value">{propertyTypeLabel(extractedData.property_type)}</span>
+                  </div>
+                )}
+                {extractedData.sale_currency && (
+                  <div className="extracted-item">
+                    <span className="extracted-label">מטבע</span>
+                    <span className="extracted-value">{extractedData.sale_currency}</span>
+                  </div>
+                )}
+                {extractedData.property_address && (
+                  <div className="extracted-item full">
+                    <span className="extracted-label">כתובת</span>
+                    <span className="extracted-value">{extractedData.property_address}</span>
+                  </div>
+                )}
+                {extractedData.block_parcel && (
+                  <div className="extracted-item">
+                    <span className="extracted-label">גוש/חלקה</span>
+                    <span className="extracted-value">{extractedData.block_parcel}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sellers */}
+              {extractedData.sellers.length > 0 && (
+                <div className="extracted-section">
+                  <span className="extracted-section-title">מוכרים ({extractedData.sellers.length})</span>
+                  {extractedData.sellers.map((s, i) => (
+                    <div key={i} className="extracted-seller">
+                      <span>{s.name || '—'}</span>
+                      <span className="extracted-dim">ת״ז {s.id_number || '—'}</span>
+                      <span className="extracted-badge-sm">{s.share_percent || 100}%</span>
+                      {!s.birth_date && <span className="missing-inline">חסר: ת. לידה</span>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {/* Buyers */}
-          {extractedData.buyers && extractedData.buyers.length > 0 && (
-            <div className="extracted-section">
-              <span className="extracted-section-title">קונים ({extractedData.buyers.length})</span>
-              {extractedData.buyers.map((b, i) => (
-                <div key={i} className="extracted-seller">
-                  <span>{b.name || '—'}</span>
-                  <span className="extracted-dim">ת״ז {b.id_number || '—'}</span>
+              {/* Buyers */}
+              {extractedData.buyers && extractedData.buyers.length > 0 && (
+                <div className="extracted-section">
+                  <span className="extracted-section-title">קונים ({extractedData.buyers.length})</span>
+                  {extractedData.buyers.map((b, i) => (
+                    <div key={i} className="extracted-seller">
+                      <span>{b.name || '—'}</span>
+                      <span className="extracted-dim">ת״ז {b.id_number || '—'}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {/* Acquisitions */}
-          {extractedData.acquisitions.length > 0 && (
-            <div className="extracted-section">
-              <span className="extracted-section-title">רכישה מקורית</span>
-              {extractedData.acquisitions.map((a, i) => (
-                <div key={i} className="extracted-seller">
-                  <span>{a.acquisition_date || '—'}</span>
-                  <span>{acquisitionTypeLabel(a.acquisition_type)}</span>
-                  <span className="extracted-amount">
-                    {a.amount ? `₪${a.amount.toLocaleString()}` : <span className="missing-inline">חסר: סכום רכישה</span>}
-                  </span>
+              {/* Acquisitions */}
+              {extractedData.acquisitions.length > 0 && (
+                <div className="extracted-section">
+                  <span className="extracted-section-title">רכישה מקורית</span>
+                  {extractedData.acquisitions.map((a, i) => (
+                    <div key={i} className="extracted-seller">
+                      <span>{a.acquisition_date || '—'}</span>
+                      <span>{acquisitionTypeLabel(a.acquisition_type)}</span>
+                      <span className="extracted-amount">
+                        {a.amount ? `₪${a.amount.toLocaleString()}` : <span className="missing-inline">חסר: סכום רכישה</span>}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {/* Payment Schedule */}
-          {extractedData.payment_schedule && (
-            <div className="extracted-section">
-              <span className="extracted-section-title">לוח תשלומים</span>
-              <div className="extracted-notes">{extractedData.payment_schedule}</div>
-            </div>
-          )}
+              {/* Payment Schedule */}
+              {extractedData.payment_schedule && (
+                <div className="extracted-section">
+                  <span className="extracted-section-title">לוח תשלומים</span>
+                  <div className="extracted-notes">{extractedData.payment_schedule}</div>
+                </div>
+              )}
 
-          {/* Notes */}
-          {extractedData.notes && (
-            <div className="extracted-section">
-              <span className="extracted-section-title">הערות</span>
-              <div className="extracted-notes">{extractedData.notes}</div>
+              {/* Notes */}
+              {extractedData.notes && (
+                <div className="extracted-section">
+                  <span className="extracted-section-title">הערות</span>
+                  <div className="extracted-notes">{extractedData.notes}</div>
+                </div>
+              )}
             </div>
           )}
 
