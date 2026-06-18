@@ -8,12 +8,24 @@ interface Props {
   onDataExtracted: (partial: Partial<TransactionInput>) => void
 }
 
+interface ExtractedData {
+  sale_date: string | null
+  sale_amount: number | null
+  sale_currency: string | null
+  sellers: Array<{ name?: string; id_number?: string; share_percent?: number }>
+  acquisitions: Array<{ acquisition_date?: string; acquisition_type?: string; amount?: number }>
+  property_address: string | null
+  block_parcel: string | null
+  notes: string | null
+  confidence: string
+}
+
 export default function UploadContract({ token, onDataExtracted }: Props) {
   const [showCodeModal, setShowCodeModal] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
@@ -27,7 +39,6 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
   function handleCodeVerified() {
     setCodeVerified(true)
     setShowCodeModal(false)
-    // Now trigger file picker
     setTimeout(() => fileRef.current?.click(), 100)
   }
 
@@ -37,17 +48,18 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
 
     setUploading(true)
     setError('')
-    setSuccess('')
+    setExtractedData(null)
 
     const formData = new FormData()
     formData.append('file', file)
 
     try {
       const { data } = await axios.post('/api/upload-contract', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
+
+      // Show extracted results
+      setExtractedData(data)
 
       // Map extracted data to form format
       const partial: Partial<TransactionInput> = {}
@@ -78,7 +90,6 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       }
 
       onDataExtracted(partial)
-      setSuccess(`חוזה נקרא בהצלחה (רמת ביטחון: ${data.confidence === 'high' ? 'גבוהה' : data.confidence === 'medium' ? 'בינונית' : 'נמוכה'})`)
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.data?.detail) {
         setError(err.response.data.detail)
@@ -87,10 +98,18 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       }
     } finally {
       setUploading(false)
-      // Reset file input
       if (fileRef.current) fileRef.current.value = ''
     }
   }
+
+  function dismissResults() {
+    setExtractedData(null)
+  }
+
+  const confidenceLabel = (c: string) =>
+    c === 'high' ? 'גבוהה ✓' : c === 'medium' ? 'בינונית ⚠' : 'נמוכה'
+  const confidenceColor = (c: string) =>
+    c === 'high' ? 'var(--success)' : c === 'medium' ? '#fbbf24' : '#f87171'
 
   return (
     <>
@@ -118,8 +137,81 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
           style={{ display: 'none' }}
         />
         {error && <span className="upload-error">{error}</span>}
-        {success && <span className="upload-success">{success}</span>}
       </div>
+
+      {/* Extracted Results Panel */}
+      {extractedData && (
+        <div className="extracted-results">
+          <div className="extracted-header">
+            <h3>📋 נתונים שחולצו מהחוזה</h3>
+            <div className="extracted-badge" style={{ color: confidenceColor(extractedData.confidence) }}>
+              {confidenceLabel(extractedData.confidence)}
+            </div>
+          </div>
+
+          <div className="extracted-grid">
+            {extractedData.sale_date && (
+              <div className="extracted-item">
+                <span className="extracted-label">תאריך מכירה</span>
+                <span className="extracted-value">{extractedData.sale_date}</span>
+              </div>
+            )}
+            {extractedData.sale_amount && (
+              <div className="extracted-item">
+                <span className="extracted-label">סכום מכירה</span>
+                <span className="extracted-value extracted-amount">₪{extractedData.sale_amount.toLocaleString()}</span>
+              </div>
+            )}
+            {extractedData.property_address && (
+              <div className="extracted-item full">
+                <span className="extracted-label">כתובת</span>
+                <span className="extracted-value">{extractedData.property_address}</span>
+              </div>
+            )}
+            {extractedData.block_parcel && (
+              <div className="extracted-item">
+                <span className="extracted-label">גוש/חלקה</span>
+                <span className="extracted-value">{extractedData.block_parcel}</span>
+              </div>
+            )}
+          </div>
+
+          {extractedData.sellers.length > 0 && (
+            <div className="extracted-section">
+              <span className="extracted-section-title">מוכרים ({extractedData.sellers.length})</span>
+              {extractedData.sellers.map((s, i) => (
+                <div key={i} className="extracted-seller">
+                  <span>{s.name || '—'}</span>
+                  <span className="extracted-dim">{s.id_number || ''}</span>
+                  <span className="extracted-badge-sm">{s.share_percent || 100}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {extractedData.acquisitions.length > 0 && (
+            <div className="extracted-section">
+              <span className="extracted-section-title">רכישות</span>
+              {extractedData.acquisitions.map((a, i) => (
+                <div key={i} className="extracted-seller">
+                  <span>{a.acquisition_date || '—'}</span>
+                  <span>{a.acquisition_type === 'purchase' ? 'רכישה' : a.acquisition_type === 'inheritance' ? 'ירושה' : a.acquisition_type || '—'}</span>
+                  <span className="extracted-amount">{a.amount ? `₪${a.amount.toLocaleString()}` : '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {extractedData.notes && (
+            <div className="extracted-notes">{extractedData.notes}</div>
+          )}
+
+          <div className="extracted-footer">
+            <span className="extracted-dim">הנתונים מולאו בטופס אוטומטית. בדוק ותקן לפני חישוב.</span>
+            <button className="btn btn-sm btn-secondary" onClick={dismissResults} type="button">הסתר</button>
+          </div>
+        </div>
+      )}
 
       {showCodeModal && (
         <CodeNameModal
