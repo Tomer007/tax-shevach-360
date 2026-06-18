@@ -79,8 +79,8 @@ async def upload_contract(
     if not text.strip():
         raise HTTPException(status_code=400, detail="File is empty")
 
-    if len(text) > 50_000:
-        raise HTTPException(status_code=400, detail="File too large (max 50KB text)")
+    if len(text) > 200_000:
+        raise HTTPException(status_code=400, detail="File too large (max 200KB text)")
 
     try:
         result = parse_contract_text(text)
