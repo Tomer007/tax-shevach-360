@@ -7,8 +7,9 @@ transaction details to fill the calculator form.
 import json
 import os
 
+import openai
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
@@ -59,12 +60,12 @@ class ParsedContract(BaseModel):
     sale_date: str | None = None
     sale_amount: float | None = None
     sale_currency: str | None = "ILS"
-    sellers: list[dict] = []
-    acquisitions: list[dict] = []
+    sellers: list[dict] = Field(default_factory=list)
+    acquisitions: list[dict] = Field(default_factory=list)
     property_address: str | None = None
     block_parcel: str | None = None
     notes: str | None = None
-    raw_text: str = ""
+    raw_text: str = Field(default="", exclude=True)  # Excluded from API response
     confidence: str = "low"
 
 
@@ -74,40 +75,55 @@ def parse_contract_text(text: str) -> ParsedContract:
         raise ValueError("OPENAI_API_KEY environment variable not set")
 
     client = OpenAI(api_key=OPENAI_API_KEY)
-
     model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": EXTRACTION_PROMPT},
-            {"role": "user", "content": f"Extract transaction details from this contract:\n\n{text}"},
-        ],
-        temperature=0.1,
-        response_format={"type": "json_object"},
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": EXTRACTION_PROMPT},
+                {"role": "user", "content": f"Extract transaction details from this contract:\n\n{text}"},
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            timeout=30.0,
+        )
+    except openai.AuthenticationError:
+        raise ValueError("AI service configuration error - invalid API key")
+    except openai.RateLimitError:
+        raise ValueError("AI service temporarily unavailable - rate limited")
+    except openai.APITimeoutError:
+        raise ValueError("AI service timed out - please try again")
 
     content = response.choices[0].message.content or "{}"
 
     try:
         data = json.loads(content)
     except json.JSONDecodeError:
-        return ParsedContract(raw_text=text, confidence="failed")
+        return ParsedContract(confidence="failed")
+
+    # Validate and sanitize numeric fields
+    sale_amount = data.get("sale_amount")
+    if sale_amount is not None:
+        try:
+            sale_amount = float(sale_amount)
+        except (ValueError, TypeError):
+            sale_amount = None
 
     # Determine confidence based on completeness
-    has_sale = data.get("sale_date") and data.get("sale_amount")
+    has_sale = data.get("sale_date") and sale_amount
     has_sellers = bool(data.get("sellers"))
     confidence = "high" if (has_sale and has_sellers) else "medium" if has_sale else "low"
 
     return ParsedContract(
         sale_date=data.get("sale_date"),
-        sale_amount=data.get("sale_amount"),
+        sale_amount=sale_amount,
         sale_currency=data.get("sale_currency") or "ILS",
         sellers=data.get("sellers") or [],
         acquisitions=data.get("acquisitions") or [],
         property_address=data.get("property_address"),
         block_parcel=data.get("block_parcel"),
         notes=data.get("notes"),
-        raw_text=text[:500],
+        raw_text=text[:200],
         confidence=confidence,
     )

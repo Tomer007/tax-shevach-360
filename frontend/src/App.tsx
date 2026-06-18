@@ -109,6 +109,11 @@ export default function App() {
     setLoading(true)
     setError(null)
     try {
+      // Validate required fields before submission
+      if (!formData.sale_date || !formData.sale_amount || !formData.sellers?.length || !formData.acquisitions?.length) {
+        setError('חסרים נתונים חיוניים: תאריך מכירה, סכום, מוכרים ורכישות.')
+        return
+      }
       const input = formData as TransactionInput
       const calcResult = await calculateTax(input)
       setResult(calcResult)

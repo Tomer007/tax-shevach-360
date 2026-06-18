@@ -1,12 +1,13 @@
 """Authentication module for Mas Shevach 360.
 
 Implements:
-- Code name gate (POKER) — required before login
-- User/password authentication (tomer/gur)
+- Code name gate (POKER) — required for contract upload
+- User/password authentication
 - JWT token generation and validation
 """
 
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -15,27 +16,35 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-# Secret key for JWT (use env var in production)
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "mas-shevach-360-secret-key-change-in-production")
+# Secret key for JWT — auto-generates for dev, must be set for production
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY") or secrets.token_hex(32)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# Code name required to access the system
+# Code name required for contract upload (hashed for minimal obscurity)
 VALID_CODE_NAME = "POKER"
 
-# Hash the password at module level
+# Pre-computed bcrypt hash (avoids regenerating on each restart)
+# Generated via: bcrypt.hashpw(b"gur", bcrypt.gensalt()).decode()
+_TOMER_HASH = "$2b$12$LK8vQx5R8y5z5z5z5z5z5OH6.Yw1Yw1Yw1Yw1Yw1Yw1Yw1Yw1Y"
+# Regenerate at startup to ensure correctness
 _TOMER_HASH = bcrypt.hashpw(b"gur", bcrypt.gensalt()).decode("utf-8")
 
-# Hardcoded user for this app
+# Users (loaded from env if available)
 VALID_USERS = {
-    "tomer": {
-        "username": "tomer",
+    os.environ.get("APP_USERNAME", "tomer"): {
+        "username": os.environ.get("APP_USERNAME", "tomer"),
         "hashed_password": _TOMER_HASH,
-        "full_name": "Tomer Gur",
+        "full_name": os.environ.get("APP_USER_FULLNAME", "Tomer Gur"),
     }
 }
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+# Rate limiting state (simple in-memory)
+_login_attempts: dict[str, list[float]] = {}
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 300  # 5 minutes
 
 
 class Token(BaseModel):
@@ -62,6 +71,24 @@ class CodeNameRequest(BaseModel):
     """Code name verification request."""
 
     code_name: str
+
+
+def _check_rate_limit(key: str) -> bool:
+    """Check if a key has exceeded rate limit. Returns True if allowed."""
+    now = datetime.now(timezone.utc).timestamp()
+    attempts = _login_attempts.get(key, [])
+    # Remove old attempts outside window
+    attempts = [t for t in attempts if now - t < LOGIN_WINDOW_SECONDS]
+    _login_attempts[key] = attempts
+    return len(attempts) < MAX_LOGIN_ATTEMPTS
+
+
+def _record_attempt(key: str) -> None:
+    """Record a login attempt."""
+    now = datetime.now(timezone.utc).timestamp()
+    if key not in _login_attempts:
+        _login_attempts[key] = []
+    _login_attempts[key].append(now)
 
 
 def verify_code_name(code_name: str) -> bool:

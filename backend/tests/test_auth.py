@@ -172,6 +172,9 @@ class TestContractUpload:
         assert response.status_code == 503
 
     def _get_token(self) -> str:
+        # Clear rate limit for tests
+        from app.auth import _login_attempts
+        _login_attempts.clear()
         resp = client.post("/api/auth/login", json={"username": "tomer", "password": "gur"})
         return resp.json()["access_token"]
 

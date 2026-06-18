@@ -12,8 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.calculator import calculate_transaction
-from app.models import CalculationResult, TransactionInput
 from app.routes import router
 from app.auth_routes import router as auth_router
 
@@ -24,7 +22,6 @@ app = FastAPI(
 )
 
 # CORS: restricted by default, configurable via env var
-# In production (Render): set CORS_ORIGINS=https://mas-shevach-360.onrender.com
 ALLOWED_ORIGINS = os.environ.get(
     "CORS_ORIGINS",
     "http://localhost:3000,http://localhost:5173",
@@ -57,7 +54,10 @@ if STATIC_DIR.is_dir():
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
         """Serve the SPA index.html for all non-API routes."""
-        file_path = STATIC_DIR / full_path
+        # Prevent path traversal
+        file_path = (STATIC_DIR / full_path).resolve()
+        if not str(file_path).startswith(str(STATIC_DIR.resolve())):
+            return FileResponse(STATIC_DIR / "index.html")
         if file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(STATIC_DIR / "index.html")

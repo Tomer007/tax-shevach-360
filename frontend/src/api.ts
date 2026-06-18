@@ -6,6 +6,27 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Attach auth token to all requests
+client.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Handle 401 responses globally (expired token)
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      sessionStorage.removeItem('token')
+      window.location.reload()
+    }
+    return Promise.reject(error)
+  }
+)
+
 export async function calculateTax(input: TransactionInput): Promise<CalculationResult> {
   const { data } = await client.post<CalculationResult>('/calculate', input)
   return data

@@ -1,14 +1,17 @@
 """Authentication and contract upload routes."""
 
 import logging
-import fitz  # PyMuPDF
+import os
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+import fitz  # PyMuPDF
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 
 from app.auth import (
     CodeNameRequest,
     LoginRequest,
     Token,
+    _check_rate_limit,
+    _record_attempt,
     authenticate_user,
     create_access_token,
     get_current_user,
@@ -21,10 +24,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {".txt", ".pdf", ".doc", ".docx"}
+MAX_FILE_SIZE = 10_000_000  # 10MB
+
+
+def _get_client_ip(request: Request) -> str:
+    """Get client IP for rate limiting."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 
 @router.post("/auth/verify-code")
-def verify_access_code(request: CodeNameRequest):
-    """Verify the access code name (POKER) before allowing login."""
+def verify_access_code(request: CodeNameRequest, raw_request: Request):
+    """Verify the access code name (POKER) before allowing contract upload."""
+    client_ip = _get_client_ip(raw_request)
+    if not _check_rate_limit(f"code:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="יותר מדי ניסיונות. נסה שוב בעוד מספר דקות.",
+        )
+    _record_attempt(f"code:{client_ip}")
+
     if not verify_code_name(request.code_name):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -34,8 +57,16 @@ def verify_access_code(request: CodeNameRequest):
 
 
 @router.post("/auth/login", response_model=Token)
-def login(request: LoginRequest):
+def login(request: LoginRequest, raw_request: Request):
     """Authenticate user and return JWT token."""
+    client_ip = _get_client_ip(raw_request)
+    if not _check_rate_limit(f"login:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="יותר מדי ניסיונות כניסה. נסה שוב בעוד 5 דקות.",
+        )
+    _record_attempt(f"login:{client_ip}")
+
     user = authenticate_user(request.username, request.password)
     if not user:
         raise HTTPException(
@@ -63,26 +94,29 @@ async def upload_contract(
 ):
     """Upload a contract document and extract transaction details using AI.
 
-    Accepts plain text files (.txt) or PDF text content.
-    Requires authentication.
+    Accepts PDF or text files. Requires authentication.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
+    # Validate file extension
+    filename = file.filename.lower()
+    ext = os.path.splitext(filename)[1]
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"סוג קובץ לא נתמך. נתמכים: {', '.join(ALLOWED_EXTENSIONS)}")
+
     # Read file content
     content = await file.read()
-    logger.info(f"Upload: filename={file.filename}, size={len(content)} bytes, content_type={file.content_type}")
+    logger.info(f"Upload: filename={file.filename}, size={len(content)} bytes, user={current_user['username']}")
 
-    if len(content) > 10_000_000:
-        raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="הקובץ גדול מדי (מקסימום 10MB)")
 
     # Extract text based on file type
-    filename = file.filename.lower()
     text = ""
-    is_pdf = filename.endswith(".pdf") or content[:5] == b"%PDF-"
+    is_pdf = ext == ".pdf" or content[:5] == b"%PDF-"
 
     if is_pdf:
-        # Extract text from PDF using PyMuPDF
         try:
             doc = fitz.open(stream=content, filetype="pdf")
             for page in doc:
@@ -91,49 +125,27 @@ async def upload_contract(
                     text += page_text + "\n"
             doc.close()
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Could not read PDF file: {str(e)}")
+            logger.error(f"PDF parsing error: {e}")
+            raise HTTPException(status_code=400, detail="לא ניתן לקרוא את קובץ ה-PDF")
 
-        # If no text extracted (scanned PDF), try OCR via PyMuPDF
-        if not text.strip():
-            try:
-                doc = fitz.open(stream=content, filetype="pdf")
-                for page_num in range(min(len(doc), 5)):  # First 5 pages max
-                    page = doc[page_num]
-                    # Get page as image and use tessaract OCR if available
-                    page_text = page.get_text("text", flags=fitz.TEXT_PRESERVE_WHITESPACE)
-                    if not page_text.strip():
-                        # Try extracting from text blocks
-                        blocks = page.get_text("blocks")
-                        for block in blocks:
-                            if block[6] == 0:  # Text block
-                                page_text += block[4] + "\n"
-                    text += page_text + "\n"
-                doc.close()
-            except Exception:
-                pass
-
-        # Still no text? The PDF is purely scanned images - inform the user
         if not text.strip():
             raise HTTPException(
                 status_code=400,
                 detail="הקובץ מכיל תמונות סרוקות בלבד. אנא העלה קובץ PDF עם שכבת טקסט, או קובץ טקסט."
             )
     else:
-        # Try as text file
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError:
             try:
                 text = content.decode("latin-1")
             except Exception:
-                raise HTTPException(status_code=400, detail="Could not read file encoding")
+                raise HTTPException(status_code=400, detail="לא ניתן לקרוא את קידוד הקובץ")
 
     if not text.strip():
-        raise HTTPException(status_code=400, detail="No text could be extracted from file")
+        raise HTTPException(status_code=400, detail="לא ניתן לחלץ טקסט מהקובץ")
 
-    logger.info(f"Extracted {len(text)} chars from {file.filename}. First 100: {text[:100]}")
-
-    # Truncate for AI processing
+    # Truncate for AI processing (first 30K chars is enough)
     text_for_parsing = text[:30_000]
 
     try:
@@ -141,9 +153,12 @@ async def upload_contract(
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing failed: {type(e).__name__}")
+        logger.error(f"Contract parsing error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="שגיאה בניתוח החוזה. נסה שוב.")
 
-    # Send email notification with parsed results
-    send_contract_result_email(result.model_dump(), file.filename or "unknown")
+    # Send email notification (non-blocking, failures are logged)
+    email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown")
+    if not email_sent:
+        logger.warning(f"Failed to send email notification for {file.filename}")
 
     return result
