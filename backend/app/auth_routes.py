@@ -92,6 +92,32 @@ async def upload_contract(
             doc.close()
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Could not read PDF file: {str(e)}")
+
+        # If no text extracted (scanned PDF), try OCR via PyMuPDF
+        if not text.strip():
+            try:
+                doc = fitz.open(stream=content, filetype="pdf")
+                for page_num in range(min(len(doc), 5)):  # First 5 pages max
+                    page = doc[page_num]
+                    # Get page as image and use tessaract OCR if available
+                    page_text = page.get_text("text", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+                    if not page_text.strip():
+                        # Try extracting from text blocks
+                        blocks = page.get_text("blocks")
+                        for block in blocks:
+                            if block[6] == 0:  # Text block
+                                page_text += block[4] + "\n"
+                    text += page_text + "\n"
+                doc.close()
+            except Exception:
+                pass
+
+        # Still no text? The PDF is purely scanned images - inform the user
+        if not text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="הקובץ מכיל תמונות סרוקות בלבד. אנא העלה קובץ PDF עם שכבת טקסט, או קובץ טקסט."
+            )
     else:
         # Try as text file
         try:
