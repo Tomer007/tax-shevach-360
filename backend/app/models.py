@@ -4,7 +4,7 @@ from datetime import date
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Currency(str, Enum):
@@ -66,6 +66,14 @@ class Seller(BaseModel):
         default_factory=list,
         description="Years where max mode (25% cap) applies (years 2000-2030)",
     )
+
+    @field_validator("birth_date", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v: object) -> object:
+        """Convert empty string to None for optional date fields."""
+        if v == "" or v == "null":
+            return None
+        return v
 
 
 class AcquisitionPart(BaseModel):

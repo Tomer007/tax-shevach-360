@@ -956,6 +956,28 @@ body {
   color: #fca5a5;
 }
 
+.parser-select {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  min-height: 34px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 8px center;
+  padding-left: 24px;
+}
+
+.parser-select:focus {
+  outline: 1px solid var(--primary);
+  border-color: var(--primary);
+}
+
 .upload-success {
   font-size: 0.78rem;
   color: var(--success);

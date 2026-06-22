@@ -22,6 +22,7 @@ from app.auth import (
 )
 from app.contract_parser import ParsedContract, parse_contract_text, parse_contract_images
 from app.email_service import send_contract_result_email
+from app.local_parser import parse_contract_text_local, parse_contract_images_local, is_ollama_available
 from app.models import TransactionInput
 
 logger = logging.getLogger(__name__)
@@ -95,15 +96,31 @@ def get_me(current_user: dict = Depends(get_current_user)):
     }
 
 
+@router.get("/parser-options")
+def get_parser_options():
+    """Get available parser options (AI vs local)."""
+    ollama_available = is_ollama_available()
+    return {
+        "options": [
+            {"id": "ai", "label": "AI (OpenAI)", "available": True, "description": "GPT-4o — דיוק גבוה, דורש חיבור לאינטרנט"},
+            {"id": "local", "label": "מודל מקומי (Ollama)", "available": ollama_available, "description": "Llama — ללא עלות, רץ על המחשב המקומי"},
+        ],
+        "default": "ai",
+    }
+
+
 @router.post("/upload-contract", response_model=ParsedContract)
 async def upload_contract(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
+    parser: str = "ai",  # "ai" (OpenAI) or "local" (Ollama)
 ):
     """Upload a contract document and extract transaction details using AI.
 
     Accepts PDF or text files. Requires authentication.
+    Query param `parser`: "ai" for OpenAI (default), "local" for Ollama.
     """
+    use_local = parser.lower() == "local"
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
@@ -163,7 +180,10 @@ async def upload_contract(
                 doc.close()
 
                 if images_b64:
-                    result = parse_contract_images(images_b64)
+                    if use_local:
+                        result = parse_contract_images_local(images_b64)
+                    else:
+                        result = parse_contract_images(images_b64)
                     # Log extracted fields as pretty JSON for debugging
 
                     logger.warning(
@@ -204,7 +224,10 @@ async def upload_contract(
     text_for_parsing = text[:30_000]
 
     try:
-        result = parse_contract_text(text_for_parsing)
+        if use_local:
+            result = parse_contract_text_local(text_for_parsing)
+        else:
+            result = parse_contract_text(text_for_parsing)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
@@ -227,7 +250,10 @@ async def upload_contract(
             doc.close()
 
             if images_b64:
-                vision_result = parse_contract_images(images_b64)
+                if use_local:
+                    vision_result = parse_contract_images_local(images_b64)
+                else:
+                    vision_result = parse_contract_images(images_b64)
                 # Use vision result only if it's better (has sale_amount)
                 if vision_result.sale_amount:
                     result = vision_result

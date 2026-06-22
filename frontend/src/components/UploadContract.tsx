@@ -6,6 +6,7 @@ import CodeNameModal from './CodeNameModal'
 interface Props {
   token: string
   onDataExtracted: (partial: Partial<TransactionInput>) => void
+  onPendingChange?: (pending: boolean) => void
 }
 
 interface ExtractedData {
@@ -29,7 +30,7 @@ interface MissingField {
   critical: boolean
 }
 
-export default function UploadContract({ token, onDataExtracted }: Props) {
+export default function UploadContract({ token, onDataExtracted, onPendingChange }: Props) {
   const [showCodeModal, setShowCodeModal] = useState(false)
   const [codeVerified, setCodeVerified] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -37,6 +38,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [approved, setApproved] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
+  const [parserMode, setParserMode] = useState<'ai' | 'local'>('ai')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
@@ -67,11 +69,14 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     formData.append('file', file)
 
     try {
-      const { data } = await axios.post('/api/upload-contract', formData, {
+      const { data } = await axios.post(`/api/upload-contract?parser=${parserMode}`, formData, {
         headers: { Authorization: `Bearer ${token}` },
       })
 
       setExtractedData(data)
+
+      // Signal that we have pending data (form should be hidden)
+      onPendingChange?.(true)
 
       // Auto-approve if confidence is high and critical fields are present
       if (data.confidence === 'high' && data.sale_amount && data.sale_date) {
@@ -123,6 +128,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     if (partial) {
       setApproved(true)
       setShowDetails(false)
+      onPendingChange?.(false)
       onDataExtracted(partial)
     }
   }
@@ -207,6 +213,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     console.log('[UploadContract] Sending to form:', JSON.stringify(partial, null, 2))
     setApproved(true)
     setShowDetails(false)
+    onPendingChange?.(false)
     onDataExtracted(partial)
   }
 
@@ -214,6 +221,7 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     setExtractedData(null)
     setApproved(false)
     setShowDetails(false)
+    onPendingChange?.(false)
   }
 
   const confidenceLabel = (c: string) =>
@@ -243,6 +251,15 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
             '📄 העלה חוזה'
           )}
         </button>
+        <select
+          className="parser-select"
+          value={parserMode}
+          onChange={(e) => setParserMode(e.target.value as 'ai' | 'local')}
+          title="בחר מנוע ניתוח"
+        >
+          <option value="ai">🌐 AI (OpenAI)</option>
+          <option value="local">💻 מודל מקומי</option>
+        </select>
         <input
           ref={fileRef}
           type="file"

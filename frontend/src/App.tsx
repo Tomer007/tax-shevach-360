@@ -48,6 +48,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filledFromContract, setFilledFromContract] = useState(false)
+  const [pendingExtraction, setPendingExtraction] = useState(false)
 
   // Triple-click on title to fill demo data
   const clickCountRef = useRef(0)
@@ -212,8 +213,11 @@ export default function App() {
       </header>
 
       {/* Upload contract */}
-      <UploadContract token={token} onDataExtracted={handleContractData} />
+      <UploadContract token={token} onDataExtracted={handleContractData} onPendingChange={setPendingExtraction} />
 
+      {/* Hide form while contract extraction is pending approval */}
+      {!pendingExtraction && (
+      <>
       {/* Steps indicator */}
       <nav className="steps" aria-label="שלבי הטופס" id="main-content">
         {STEPS.map((step, i) => {
@@ -274,6 +278,8 @@ export default function App() {
           <div className="spinner" aria-hidden="true" />
           <span className="loading-text">מחשב את המס...</span>
         </div>
+      )}
+      </>
       )}
     </div>
   )
