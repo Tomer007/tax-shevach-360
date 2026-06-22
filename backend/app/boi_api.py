@@ -98,3 +98,59 @@ def convert_to_ils(amount: float, currency: Currency, rate: float | None) -> flo
         # Fallback: return amount as-is (assume ILS)
         return amount
     return amount * rate
+
+
+# --- Synchronous rate fetching with cache (for calculator use) ---
+_rate_cache: dict[str, float] = {}
+
+
+def fetch_exchange_rate_sync(currency: Currency, target_date: date) -> float | None:
+    """Synchronous version of fetch_exchange_rate with in-memory cache.
+
+    Uses Bank of Israel API for historical rates. Caches results to avoid
+    repeated API calls during calculation.
+    """
+    if currency == Currency.ILS:
+        return 1.0
+    if currency == Currency.ILP:
+        return ILP_TO_ILS
+    if currency == Currency.ILR:
+        return ILR_TO_ILS
+
+    series = EXCHANGE_RATE_SERIES.get(currency)
+    if not series:
+        return None
+
+    cache_key = f"{currency.value}:{target_date.isoformat()}"
+    if cache_key in _rate_cache:
+        return _rate_cache[cache_key]
+
+    # Try exact date, then ±7 days (weekends/holidays)
+    for offset in range(8):
+        for sign in ([0] if offset == 0 else [-1, 1]):
+            check_date = target_date + timedelta(days=offset * sign)
+            rate = _fetch_rate_sync(series, check_date)
+            if rate is not None:
+                _rate_cache[cache_key] = rate
+                return rate
+
+    return None
+
+
+def _fetch_rate_sync(series: str, target_date: date) -> float | None:
+    """Fetch a single rate synchronously."""
+    date_str = target_date.strftime("%Y-%m-%d")
+    url = f"{BOI_BASE_URL}/{series}?startperiod={date_str}&endperiod={date_str}&format=csv"
+
+    try:
+        with httpx.Client(timeout=API_TIMEOUT) as client:
+            response = client.get(url)
+            if response.status_code == 200:
+                lines = response.text.strip().split("\n")
+                if len(lines) >= 2:
+                    value_str = lines[-1].split(",")[-1].strip()
+                    return float(value_str)
+    except (httpx.TimeoutException, httpx.HTTPError, ValueError, IndexError):
+        pass
+
+    return None

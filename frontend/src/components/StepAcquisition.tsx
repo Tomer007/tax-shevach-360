@@ -5,6 +5,7 @@ interface Props {
   updateForm: (partial: Partial<TransactionInput>) => void
   onNext: () => void
   onPrev: () => void
+  filledFromContract?: boolean
 }
 
 const emptyAcquisition: AcquisitionPart = {
@@ -16,7 +17,7 @@ const emptyAcquisition: AcquisitionPart = {
   deceased_eligible_for_exemption: false,
 }
 
-export default function StepAcquisition({ formData, updateForm, onNext, onPrev }: Props) {
+export default function StepAcquisition({ formData, updateForm, onNext, onPrev, filledFromContract }: Props) {
   const acquisitions = formData.acquisitions ?? []
 
   function addAcquisition() {
@@ -34,7 +35,10 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
 
   const canContinue =
     acquisitions.length > 0 &&
-    acquisitions.every((a) => a.acquisition_date && (a.amount ?? 0) > 0)
+    acquisitions.every((a) => a.acquisition_date)
+
+  // Check if acquisition data is missing/empty (placeholder from contract upload)
+  const isMissingData = acquisitions.length > 0 && acquisitions.some(a => !a.acquisition_date || !(a.amount ?? 0))
 
   // Start with one acquisition if empty
   if (acquisitions.length === 0) {
@@ -45,6 +49,18 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
   return (
     <div className="card">
       <h3 className="card-title">פרטי הרכישה</h3>
+
+      {/* Guidance when data is missing from contract */}
+      {filledFromContract && isMissingData && (
+        <div className="info-panel neutral" style={{ marginBottom: 20 }}>
+          <div className="info-panel-title" style={{ color: 'var(--warning)' }}>
+            ⚠️ פרטי הרכישה לא נמצאו בחוזה המכר
+          </div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+            יש למלא את תאריך הרכישה וסכום הרכישה המקורי מהחוזה המקורי או מנסח הרישום.
+          </p>
+        </div>
+      )}
 
       {acquisitions.map((acq, idx) => (
         <div key={idx} className="seller-card">
@@ -104,6 +120,9 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev }
                 <option value="ILP">לי"ר ישראלית</option>
                 <option value="ILR">שקל ישן</option>
               </select>
+              {acq.currency !== 'ILS' && acq.currency !== 'ILP' && acq.currency !== 'ILR' && (
+                <span className="helper-text">שער ההמרה נלקח מבנק ישראל ליום הרכישה</span>
+              )}
             </div>
             <div className="form-group">
               <label htmlFor={`acq-share-${idx}`}>חלק שנרכש (%)</label>

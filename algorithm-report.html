@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מס שבח 360 — תיעוד אלגוריתם וסגרת חישוב</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --border: rgba(99, 102, 241, 0.15);
+  --primary: #818cf8;
+  --accent: #a78bfa;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --text: #e4e4e7;
+  --text-dim: #a1a1aa;
+  --text-faint: #71717a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Heebo', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.8;
+  padding: 40px 20px 80px;
+}
+.container { max-width: 900px; margin: 0 auto; }
+h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #818cf8, #a78bfa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.subtitle { text-align: center; color: var(--text-dim); font-size: 0.9rem; margin-bottom: 40px; }
+h2 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 40px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin: 24px 0 10px;
+}
+p, li { font-size: 0.92rem; color: var(--text); margin-bottom: 10px; }
+ul, ol { padding-right: 24px; margin-bottom: 16px; }
+li { margin-bottom: 6px; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin: 16px 0;
+}
+.formula {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-family: monospace;
+  direction: ltr;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--success);
+  overflow-x: auto;
+}
+.note {
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--warning);
+}
+.note::before { content: "⚠️ "; }
+.assumption {
+  background: rgba(99, 102, 241, 0.05);
+  border-right: 3px solid var(--primary);
+  padding: 12px 16px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 0.85rem;
+}
+th, td {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  text-align: right;
+}
+th { background: var(--surface); color: var(--primary); font-weight: 600; }
+td { color: var(--text); }
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-fixed { background: rgba(52, 211, 153, 0.15); color: var(--success); }
+.badge-approx { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+.disclaimer {
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 40px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--danger);
+}
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>מס שבח 360</h1>
+<p class="subtitle">תיעוד אלגוריתם החישוב, הנחות יסוד, ומגבלות — גרסה 1.0</p>
+
+<!-- ===== Section 1 ===== -->
+<h2>1. סקירה כללית</h2>
+<p>המערכת מחשבת מס שבח מקרקעין (Capital Gains Tax) לעסקאות מכר דירות מגורים ונכסים בישראל. החישוב מבוסס על חוק מיסוי מקרקעין (שבח ורכישה), תשכ"ג-1963, כולל תיקון 76 (ליניארי מוטב).</p>
+
+<div class="card">
+<h3>תהליך החישוב הבסיסי:</h3>
+<ol>
+<li>חישוב שווי הרכישה המשוערך (לפי מדד המחירים לצרכן)</li>
+<li>חישוב ניכויים משוערכים (שיפוצים, שכ"ט, וכו')</li>
+<li>חישוב שבח מקרקעין = שווי מכירה − עלות משוערכת</li>
+<li>הפרדה לסכום אינפלציוני ושבח ריאלי</li>
+<li>חלוקה ליניארית לפי תקופות (לפני/אחרי 1.1.2014)</li>
+<li>השוואת מסלולי מיסוי (ליניארי מוטב, רגיל, פריסה, פטור)</li>
+<li>חישוב מס יסף</li>
+</ol>
+</div>
+
+<!-- ===== Section 2 ===== -->
+<h2>2. שערוך (אינדקסציה)</h2>
+
+<h3>2.1 מדד המחירים לצרכן (CPI)</h3>
+<p>כל סכום (רכישה, ניכויים) משוערך מתאריך הוצאתו ליום המכירה לפי יחס מדדי CPI.</p>
+<div class="formula">
+indexed_amount = original_amount × (CPI_sale_year / CPI_acquisition_year)
+</div>
+
+<div class="assumption">
+<strong>הנחת יסוד:</strong> השערוך מבוצע ברמת שנה (לא חודש). הדבר עלול לסטות ±3-5% עבור רכישות בתחילת/סוף שנה. בפועל, רשות המסים משערכת לפי חודש הרכישה עד החודש שלפני המכירה.
+</div>
+
+<h3>2.2 המרת מטבע</h3>
+<p>עבור רכישות במט"ח (USD, EUR, GBP), הסכום מומר לשקלים לפי שער בנק ישראל ליום הרכישה.</p>
+<div class="formula">
+amount_ils = foreign_amount × BOI_exchange_rate(acquisition_date)
+</div>
+<p>עבור מטבעות היסטוריים:</p>
+<ul>
+<li><strong>לי"ר ישראלית (ILP)</strong> — לפני פברואר 1980: × 0.000001</li>
+<li><strong>שקל ישן (ILR)</strong> — 1980-1985: × 0.001</li>
+</ul>
+
+<!-- ===== Section 3 ===== -->
+<h2>3. חישוב השבח</h2>
+
+<h3>3.1 עלות מתואמת</h3>
+<div class="formula">
+total_cost = Σ(acquisition_indexed) + Σ(deductions_indexed) + betterment_levy − depreciation
+</div>
+
+<h3>3.2 שבח מקרקעין</h3>
+<div class="formula">
+shevach = sale_amount − total_cost
+shevach = max(0, shevach)  // שבח שלילי = אין מס
+</div>
+
+<h3>3.3 סכום אינפלציוני</h3>
+<p>הפרש בין הסכום המשוערך לסכום המקורי:</p>
+<div class="formula">
+inflationary = Σ(acquisition_ils × (indexation_ratio − 1))
+</div>
+
+<h3>3.4 שבח ריאלי</h3>
+<div class="formula">
+real_shevach = shevach − inflationary
+real_shevach = max(0, real_shevach)
+</div>
+
+<!-- ===== Section 4 ===== -->
+<h2>4. מסלולי מיסוי</h2>
+
+<h3>4.1 ליניארי מוטב (תיקון 76)</h3>
+<div class="card">
+<p><strong>תנאי זכאות:</strong></p>
+<ul>
+<li>דירת מגורים מזכה</li>
+<li>נרכשה <strong>לפני 1.1.2014</strong></li>
+</ul>
+<p><strong>חישוב:</strong></p>
+<div class="formula">
+ratio_after_2014 = days_after_2014 / total_days
+tax_linear = real_shevach × ratio_after_2014 × 25%
+// החלק שלפני 1.1.2014 = פטור (0%)
+</div>
+</div>
+
+<h3>4.2 מסלול רגיל (שיעורי מס לפי תקופות)</h3>
+<table>
+<tr><th>תקופה</th><th>שיעור מס</th><th>הערות</th></tr>
+<tr><td>לפני 7.11.2001</td><td>47%</td><td><span class="badge badge-approx">הנחה מפשטת</span> — בפועל שיעור שולי</td></tr>
+<tr><td>7.11.2001 – 31.12.2011</td><td>20%</td><td><span class="badge badge-fixed">קבוע</span></td></tr>
+<tr><td>מ-1.1.2012</td><td>25%</td><td><span class="badge badge-fixed">קבוע</span></td></tr>
+</table>
+<div class="formula">
+tax_regular = Σ(real_shevach × days_in_period/total_days × rate_for_period)
+</div>
+
+<div class="note">
+לתקופה שלפני 7.11.2001 המערכת מניחה שיעור מקסימלי של 47%. בפועל, השיעור נקבע לפי מדרגות מס הכנסה של המוכר באותן שנים, ועשוי להיות נמוך יותר.
+</div>
+
+<h3>4.3 פריסה (סעיף 48א(ה))</h3>
+<div class="card">
+<p>חלוקת השבח הריאלי על פני עד 4 שנים, כאשר כל חלק ממוסה לפי מדרגות מס הכנסה.</p>
+<div class="formula">
+spread_per_year = taxable_shevach / num_years
+year_tax = marginal_tax(spread + other_income) − marginal_tax(other_income)
+year_tax = min(year_tax, spread × 25%)  // תקרה: לא יותר מ-25%
+total_prisa_tax = Σ(year_tax)
+</div>
+<p><strong>מדרגות מס בפריסה:</strong> לפי סעיף 48ב, בתקופת הפריסה השבח ממוסה כהכנסה מעבודה (מדרגות מלאות 10%-50%), ולא כהכנסה פסיבית (רצפה 31%).</p>
+<p><strong>נקודות זיכוי:</strong> מוחלות לכל המוכרים בפריסה (לא רק מעל גיל 60).</p>
+</div>
+
+<h3>4.4 פטור דירה יחידה — סעיף 49ב(2)</h3>
+<div class="card">
+<p><strong>תנאים:</strong></p>
+<ul>
+<li>דירה יחידה של המוכר</li>
+<li>בעלות של 18 חודשים לפחות</li>
+</ul>
+<p><strong>תקרת פטור (2024):</strong> ₪5,008,000</p>
+<ul>
+<li>מכירה מתחת לתקרה → פטור מלא</li>
+<li>מכירה מעל התקרה → פטור חלקי</li>
+</ul>
+<div class="formula">
+// פטור חלקי (סעיף 49א(א1)):
+exempt_ratio = ceiling / sale_amount
+exempt_shevach = real_shevach × exempt_ratio
+taxable_shevach = real_shevach × (1 − exempt_ratio)
+</div>
+</div>
+
+<!-- ===== Section 5 ===== -->
+<h2>5. מס יסף (סעיף 121ב)</h2>
+<div class="card">
+<p>מס נוסף על הכנסה מעל הסף:</p>
+<table>
+<tr><th>שנה</th><th>סף</th><th>שיעור בסיסי</th><th>תוספת 2025</th><th>סה"כ</th></tr>
+<tr><td>2024</td><td>₪721,560</td><td>3%</td><td>—</td><td>3%</td></tr>
+<tr><td>2025-2027</td><td>₪721,560</td><td>3%</td><td>2%</td><td>5%</td></tr>
+</table>
+<div class="formula">
+total_income = other_income + real_shevach
+taxable = min(real_shevach, max(0, total_income − threshold))
+mas_yesaf = taxable × (3% + 2%)  // מ-2025
+</div>
+<p><strong>חריג:</strong> דירה יחידה שמכירתה פטורה לחלוטין (עד ₪5,000,000) — פטורה ממס יסף.</p>
+</div>
+
+<!-- ===== Section 6 ===== -->
+<h2>6. מס על סכום אינפלציוני</h2>
+<p>לפי סעיף 48א(ד):</p>
+<ul>
+<li>סכום אינפלציוני שנצבר <strong>לפני 1.1.1994</strong> → מס 10%</li>
+<li>סכום אינפלציוני שנצבר <strong>אחרי 1.1.1994</strong> → פטור</li>
+</ul>
+<div class="formula">
+if acquisition_date < 1994-01-01:
+    tax_inflationary = inflationary_amount × 10%
+else:
+    tax_inflationary = 0
+</div>
+
+<!-- ===== Section 7 ===== -->
+<h2>7. תושב חוץ</h2>
+<p>תושב חוץ ממוסה בשיעור אחיד של 25% על השבח הריאלי, אך:</p>
+<ul>
+<li>עבור נכס שנרכש <strong>לפני 1.1.2014</strong> — רשאי לבחור בליניארי מוטב (כמו תושב ישראל)</li>
+<li>המערכת בוחרת את הנמוך מבין: מס ליניארי או 25% אחיד</li>
+</ul>
+
+<!-- ===== Section 8 ===== -->
+<h2>8. פחת</h2>
+<p>פחת שנוכה או שניתן לנכותו מפחית את בסיס העלות (ובכך מגדיל את השבח):</p>
+<div class="formula">
+total_cost = acquisition_indexed + deductions_indexed − depreciation
+</div>
+<p>הפחת אינו משוערך — הוא מופחת ישירות מהעלות המשוערכת.</p>
+
+<!-- ===== Section 9 ===== -->
+<h2>9. זכויות בנייה (סעיף 49ז)</h2>
+<div class="card">
+<ul>
+<li><strong>זכויות זניחות</strong> (עד ₪100,000) → פטורות לחלוטין</li>
+<li><strong>פטור כפול</strong> — אם שווי הדירה ללא זכויות עד ₪2,428,100: הזכויות פטורות עד ההפרש</li>
+<li>מעל התקרה → זכויות הבנייה חייבות במס</li>
+</ul>
+</div>
+
+<!-- ===== Section 10 ===== -->
+<h2>10. חלוקה בין מוכרים</h2>
+<p>כאשר יש מספר מוכרים, החישוב מבוצע פר-מוכר לפי חלקו היחסי:</p>
+<div class="formula">
+seller_shevach = real_shevach × (share_percent / 100)
+seller_tax = calculated_tax × (share_percent / 100)
+mas_yesaf = per_seller (based on seller's other_income)
+</div>
+
+<!-- ===== Section 11 ===== -->
+<h2>11. בחירת מסלול מומלץ</h2>
+<div class="card">
+<p>המערכת משווה את כל המסלולים ובוחרת את הזול ביותר:</p>
+<ol>
+<li>אם זכאי לפטור מלא → פטור 49ב(2)</li>
+<li>אם תושב חוץ → 25% אחיד או ליניארי (הנמוך)</li>
+<li>אם ליניארי + פריסה זול מליניארי רגיל → ליניארי + פריסה</li>
+<li>אם ליניארי זול מרגיל → ליניארי מוטב</li>
+<li>אחרת → רגיל</li>
+</ol>
+</div>
+
+<!-- ===== Section 12 ===== -->
+<h2>12. הנחות יסוד ומגבלות ידועות</h2>
+
+<table>
+<tr><th>#</th><th>נושא</th><th>הנחה/מגבלה</th><th>השפעה</th></tr>
+<tr><td>1</td><td>שערוך CPI</td><td>ברמת שנה (לא חודש)</td><td>סטייה ±3-5%</td></tr>
+<tr><td>2</td><td>מס לפני 2001</td><td>שיעור מקסימלי 47% קבוע</td><td>הערכת יתר למס רגיל</td></tr>
+<tr><td>3</td><td>פטור 49ב(2)</td><td>בדיקת תנאים מצומצמת (דירה יחידה + 18 חודשים בלבד)</td><td>לא בודק שימוש בפטור קודם</td></tr>
+<tr><td>4</td><td>מס יסף 2025</td><td>3%+2% על אותו בסיס</td><td>פרשנות שנויה במחלוקת</td></tr>
+<tr><td>5</td><td>רכישות מרובות</td><td>שימוש בתאריך המוקדם ביותר לכל החישוב</td><td>לא מפצל לפי חלקים</td></tr>
+<tr><td>6</td><td>מט"ח</td><td>שער בנק ישראל ליום הרכישה</td><td>מדויק (אם ה-API זמין)</td></tr>
+<tr><td>7</td><td>פריסה</td><td>מדרגות הכנסה מעבודה (מלאות)</td><td>תואם סעיף 48ב</td></tr>
+</table>
+
+<!-- ===== Disclaimer ===== -->
+<div class="disclaimer">
+⚖️ הנתונים להערכה בלבד ואינם מהווים ייעוץ מס.<br>
+יש להתייעץ עם עורך דין או רואה חשבון לפני הגשת שומה לרשות המסים.
+</div>
+
+</div>
+</body>
+</html>

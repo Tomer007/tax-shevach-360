@@ -1,5 +1,8 @@
 """Authentication and contract upload routes."""
 
+import base64
+import hashlib
+import json
 import logging
 import os
 
@@ -17,7 +20,7 @@ from app.auth import (
     get_current_user,
     verify_code_name,
 )
-from app.contract_parser import ParsedContract, parse_contract_text
+from app.contract_parser import ParsedContract, parse_contract_text, parse_contract_images
 from app.email_service import send_contract_result_email
 from app.models import TransactionInput
 
@@ -28,6 +31,10 @@ router = APIRouter()
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".doc", ".docx"}
 MAX_FILE_SIZE = 10_000_000  # 10MB
+
+# Simple in-memory cache for parsed contracts (keyed by file content hash)
+_parse_cache: dict[str, ParsedContract] = {}
+MAX_CACHE_SIZE = 50
 
 
 def _get_client_ip(request: Request) -> str:
@@ -47,9 +54,9 @@ def verify_access_code(request: CodeNameRequest, raw_request: Request):
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="יותר מדי ניסיונות. נסה שוב בעוד מספר דקות.",
         )
-    _record_attempt(f"code:{client_ip}")
 
     if not verify_code_name(request.code_name):
+        _record_attempt(f"code:{client_ip}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="קוד גישה שגוי",
@@ -66,10 +73,10 @@ def login(request: LoginRequest, raw_request: Request):
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="יותר מדי ניסיונות כניסה. נסה שוב בעוד 5 דקות.",
         )
-    _record_attempt(f"login:{client_ip}")
 
     user = authenticate_user(request.username, request.password)
     if not user:
+        _record_attempt(f"login:{client_ip}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="שם משתמש או סיסמה שגויים",
@@ -113,6 +120,12 @@ async def upload_contract(
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="הקובץ גדול מדי (מקסימום 10MB)")
 
+    # Check cache — if same file was already parsed, return cached result
+    file_hash = hashlib.sha256(content).hexdigest()
+    if file_hash in _parse_cache:
+        logger.info(f"Cache hit for {file.filename} (hash={file_hash[:12]})")
+        return _parse_cache[file_hash]
+
     # Extract text based on file type
     text = ""
     is_pdf = ext == ".pdf" or content[:5] == b"%PDF-"
@@ -129,12 +142,17 @@ async def upload_contract(
             logger.error(f"PDF parsing error: {e}")
             raise HTTPException(status_code=400, detail="לא ניתן לקרוא את קובץ ה-PDF")
 
-        # If no text extracted, use OpenAI Vision to read from page images
-        if not text.strip():
-            logger.info(f"No text layer in PDF, using Vision for {file.filename}")
+        # Check if text is useful: has enough Hebrew chars and contract-related keywords
+        hebrew_chars = sum(1 for c in text if '\u0590' <= c <= '\u05FF')
+        has_key_terms = any(term in text for term in ['תמורה', 'מכר', 'מוכר', 'קונה', 'חוזה', 'ש"ח', 'שקל'])
+        text_quality_ok = hebrew_chars > 100 and has_key_terms
+
+        # If no text extracted OR text quality is poor, use OpenAI Vision
+        if not text.strip() or not text_quality_ok:
+            logger.info(f"{'No text layer' if not text.strip() else 'Poor text quality'} in PDF, using Vision for {file.filename}")
             try:
-                import base64
-                from app.contract_parser import parse_contract_images
+
+
                 doc = fitz.open(stream=content, filetype="pdf")
                 images_b64: list[str] = []
                 for page_num in range(min(len(doc), 8)):  # First 8 pages
@@ -146,11 +164,24 @@ async def upload_contract(
 
                 if images_b64:
                     result = parse_contract_images(images_b64)
+                    # Log extracted fields as pretty JSON for debugging
+
+                    logger.warning(
+                        f"\n{'='*60}\n"
+                        f"PARSED CONTRACT (Vision) [{file.filename}]\n"
+                        f"{'='*60}\n"
+                        f"{json.dumps(result.model_dump(), ensure_ascii=False, indent=2, default=str)}\n"
+                        f"{'='*60}"
+                    )
                     # Send email notification with attachment
                     user_email = current_user.get("email")
                     email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
                     if not email_sent:
                         logger.warning(f"Failed to send email for {file.filename}")
+                    # Cache result
+                    if len(_parse_cache) >= MAX_CACHE_SIZE:
+                        _parse_cache.pop(next(iter(_parse_cache)))
+                    _parse_cache[file_hash] = result
                     return result
             except ValueError as e:
                 raise HTTPException(status_code=503, detail=str(e))
@@ -180,11 +211,52 @@ async def upload_contract(
         logger.error(f"Contract parsing error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=500, detail="שגיאה בניתוח החוזה. נסה שוב.")
 
+    # If text-based parsing got low confidence on a PDF, retry with Vision for better results
+    if is_pdf and result.confidence == "low" and not result.sale_amount:
+        logger.info(f"Low confidence text parse for {file.filename}, retrying with Vision")
+        try:
+
+
+            doc = fitz.open(stream=content, filetype="pdf")
+            images_b64: list[str] = []
+            for page_num in range(min(len(doc), 8)):
+                page = doc[page_num]
+                pix = page.get_pixmap(dpi=150)
+                img_bytes = pix.tobytes("png")
+                images_b64.append(base64.b64encode(img_bytes).decode("utf-8"))
+            doc.close()
+
+            if images_b64:
+                vision_result = parse_contract_images(images_b64)
+                # Use vision result only if it's better (has sale_amount)
+                if vision_result.sale_amount:
+                    result = vision_result
+                    logger.info(f"Vision retry succeeded for {file.filename}")
+        except Exception as e:
+            logger.warning(f"Vision retry failed for {file.filename}: {e}")
+            # Keep original text-based result
+
+    # Log extracted fields as pretty JSON for debugging
+
+    logger.warning(
+        f"\n{'='*60}\n"
+        f"PARSED CONTRACT [{file.filename}]\n"
+        f"{'='*60}\n"
+        f"{json.dumps(result.model_dump(), ensure_ascii=False, indent=2, default=str)}\n"
+        f"{'='*60}"
+    )
+
     # Send email notification with attachment (non-blocking, failures are logged)
     user_email = current_user.get("email")
     email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
     if not email_sent:
         logger.warning(f"Failed to send email notification for {file.filename}")
+
+    # Store in cache
+    if len(_parse_cache) >= MAX_CACHE_SIZE:
+        # Evict oldest entry
+        _parse_cache.pop(next(iter(_parse_cache)))
+    _parse_cache[file_hash] = result
 
     return result
 
@@ -202,8 +274,8 @@ def calculate_and_notify(
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Invalid input: {e}")
     except Exception as e:
-        logger.error(f"Calculation error: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="שגיאה בחישוב")
+        logger.error(f"Calculation error: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"שגיאה בחישוב: {type(e).__name__}: {e}")
 
     # Send email with results
     user_email = current_user.get("email")
@@ -214,7 +286,7 @@ def calculate_and_notify(
 
 def _send_calculation_email(result_data: dict, user: dict, user_email: str | None) -> None:
     """Send calculation results email."""
-    import json
+
     import os
     import smtplib
     from email.mime.multipart import MIMEMultipart

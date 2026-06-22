@@ -47,6 +47,7 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [filledFromContract, setFilledFromContract] = useState(false)
 
   // Triple-click on title to fill demo data
   const clickCountRef = useRef(0)
@@ -65,6 +66,7 @@ export default function App() {
       setCurrentStep('sale')
       setResult(null)
       setError(null)
+      setFilledFromContract(false)
     }
   }
 
@@ -85,8 +87,51 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />
   }
 
+  // Determine which steps are "complete" based on formData content
+  function isStepComplete(stepKey: StepKey): boolean {
+    switch (stepKey) {
+      case 'sale':
+        return !!(formData.sale_date && formData.sale_amount && formData.sale_amount > 0)
+      case 'sellers':
+        return !!(formData.sellers?.length && formData.sellers.every(s => s.name))
+      case 'acquisition':
+        return !!(formData.acquisitions?.length && formData.acquisitions.every(a => a.acquisition_date))
+      case 'deductions':
+        return currentStepIndex > STEPS.findIndex(s => s.key === 'deductions')
+      case 'exemptions':
+        return false // Never pre-complete — it's the final step with the submit button
+      default:
+        return false
+    }
+  }
+
   function updateForm(partial: Partial<TransactionInput>) {
     setFormData((prev) => ({ ...prev, ...partial }))
+  }
+
+  // Called by UploadContract after auto-approve
+  function handleContractData(partial: Partial<TransactionInput>) {
+    setFormData((prev) => ({ ...prev, ...partial }))
+    setFilledFromContract(true)
+    // Auto-navigate to first incomplete step after a short delay
+    setTimeout(() => {
+      const updatedForm = { ...formData, ...partial }
+      // Determine first incomplete step with the new data
+      const hasSale = !!(updatedForm.sale_date && updatedForm.sale_amount)
+      const hasSellers = !!(updatedForm.sellers?.length && updatedForm.sellers.every((s: { name: string }) => s.name))
+      const hasAcquisition = !!(updatedForm.acquisitions?.length && updatedForm.acquisitions.every((a: { acquisition_date: string; amount: number | null }) => a.acquisition_date && (a.amount ?? 0) > 0))
+
+      if (!hasSale) {
+        setCurrentStep('sale')
+      } else if (!hasSellers) {
+        setCurrentStep('sellers')
+      } else if (!hasAcquisition) {
+        setCurrentStep('acquisition')
+      } else {
+        setCurrentStep('exemptions')
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 300)
   }
 
   function goNext() {
@@ -132,6 +177,7 @@ export default function App() {
   function handleReset() {
     setResult(null)
     setCurrentStep('sale')
+    setFilledFromContract(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -165,27 +211,30 @@ export default function App() {
         </button>
       </header>
 
-      {/* Upload contract + Steps */}
-      <UploadContract token={token} onDataExtracted={updateForm} />
+      {/* Upload contract */}
+      <UploadContract token={token} onDataExtracted={handleContractData} />
 
       {/* Steps indicator */}
       <nav className="steps" aria-label="שלבי הטופס" id="main-content">
         {STEPS.map((step, i) => {
           const isActive = i === currentStepIndex
-          const isCompleted = i < currentStepIndex
-          const isClickable = isCompleted
+          const stepComplete = isStepComplete(step.key)
+          const isClickable = stepComplete || i < currentStepIndex
           return (
             <button
               key={step.key}
-              className={`step ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`}
+              className={`step ${isActive ? 'active' : ''} ${stepComplete && !isActive ? 'completed' : ''}`}
               onClick={() => isClickable && setCurrentStep(step.key)}
               type="button"
               aria-current={isActive ? 'step' : undefined}
-              aria-label={`שלב ${i + 1}: ${step.label}${isCompleted ? ' (הושלם)' : isActive ? ' (נוכחי)' : ''}`}
+              aria-label={`שלב ${i + 1}: ${step.label}${stepComplete ? ' (הושלם)' : isActive ? ' (נוכחי)' : ''}`}
               tabIndex={isClickable ? 0 : -1}
             >
               <span className="step-number">{i + 1}</span>
               <span>{step.label}</span>
+              {filledFromContract && stepComplete && !isActive && (
+                <span className="step-contract-badge" title="מולא מהחוזה">📄</span>
+              )}
             </button>
           )
         })}
@@ -205,7 +254,7 @@ export default function App() {
         <StepSellers formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
       )}
       {currentStep === 'acquisition' && (
-        <StepAcquisition formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
+        <StepAcquisition formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} filledFromContract={filledFromContract} />
       )}
       {currentStep === 'deductions' && (
         <StepDeductions formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />

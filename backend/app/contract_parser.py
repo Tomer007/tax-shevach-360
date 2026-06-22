@@ -51,20 +51,38 @@ Extract the following transaction details from the document. Return a JSON objec
   "block_parcel": "גוש/חלקה if available",
   "property_type": "apartment" | "house" | "land" | "commercial" | "other",
   "payment_schedule": "summary of payment terms if available",
+  "is_single_apartment": true/false (does the seller declare this is their only/single apartment - דירה יחידה),
+  "is_inheritance": true/false (was the property acquired through inheritance - ירושה),
+  "has_building_rights": true/false (does the property have building rights - זכויות בנייה, 49ז),
+  "building_rights_value": number (value of building rights if mentioned),
+  "ownership_months": number (how many months the seller owned the property, if calculable from acquisition date),
   "notes": "any other relevant information for tax calculation"
 }
 
 Rules:
-- sale_date: The date the contract was signed
-- sale_amount: The TOTAL price (תמורה/מחיר) in the contract. This is critical - look for the full amount
+- sale_date: The date the contract was signed (look for date in header, or "נערך ונחתם ביום")
+- sale_amount: The TOTAL price (תמורה/מחיר) in the contract. This is CRITICAL - look for:
+  - "התמורה" section, "סך של", "מחיר", "תמורה כוללת", "סה"כ"
+  - Payment schedule total (sum of all payments if total not explicitly stated)
+  - Numbers followed by "ש"ח" or "₪" or "(במילים:..."
+  - Even if found in payment schedule section, extract the TOTAL amount
 - sellers: The party SELLING the property (מוכר). May be a person or company (חברה/בע"מ)
 - buyers: The party BUYING (רוכש/קונה)
 - Dates must be in YYYY-MM-DD format
 - Amounts should be numbers without commas or currency symbols
 - If the contract mentions when the seller originally bought the property, include it in acquisitions
+- IMPORTANT: Look for נסח רישום (land registry extract) data - it often shows:
+  - "מהות פעולה: מכר" with a date = the original acquisition date
+  - "שטר" numbers with dates = ownership transfer dates
+  - Use the EARLIEST ownership date from the נסח as the acquisition_date
 - Identify all sellers/buyers and their ownership shares
 - Default share to 100% if only one seller
 - If currency is not specified, assume ILS
+- If the text is garbled/OCR artifacts but you can still identify key numbers and names, extract them
+- is_single_apartment: Look for declarations like "דירה יחידה", "דירתו/דירתה היחידה", "פטור 49ב(2)"
+- is_inheritance: true if acquired by inheritance (ירושה, צו ירושה, צוואה)
+- has_building_rights: true if the contract mentions building rights (זכויות בנייה, תמ"א 38, פינוי בינוי, 49ז)
+- ownership_months: Calculate from acquisition_date to sale_date if both are available. Must be at least 18 months for exemption eligibility
 - Return ONLY valid JSON, no explanations"""
 
 
@@ -82,6 +100,12 @@ class ParsedContract(BaseModel):
     property_type: str | None = None
     payment_schedule: str | None = None
     notes: str | None = None
+    # Exemption-related fields
+    is_single_apartment: bool | None = None
+    is_inheritance: bool | None = None
+    has_building_rights: bool | None = None
+    building_rights_value: float | None = None
+    ownership_months: int | None = None
     raw_text: str = Field(default="", exclude=True)  # Excluded from API response
     confidence: str = "low"
 
@@ -144,6 +168,11 @@ def parse_contract_text(text: str) -> ParsedContract:
         property_type=data.get("property_type"),
         payment_schedule=data.get("payment_schedule"),
         notes=data.get("notes"),
+        is_single_apartment=data.get("is_single_apartment"),
+        is_inheritance=data.get("is_inheritance"),
+        has_building_rights=data.get("has_building_rights"),
+        building_rights_value=data.get("building_rights_value"),
+        ownership_months=data.get("ownership_months"),
         raw_text=text[:200],
         confidence=confidence,
     )
@@ -220,6 +249,11 @@ def parse_contract_images(images_b64: list[str]) -> ParsedContract:
         property_type=data.get("property_type"),
         payment_schedule=data.get("payment_schedule"),
         notes=data.get("notes"),
+        is_single_apartment=data.get("is_single_apartment"),
+        is_inheritance=data.get("is_inheritance"),
+        has_building_rights=data.get("has_building_rights"),
+        building_rights_value=data.get("building_rights_value"),
+        ownership_months=data.get("ownership_months"),
         raw_text="[parsed from images via Vision]",
         confidence=confidence,
     )

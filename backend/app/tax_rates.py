@@ -205,15 +205,13 @@ def calculate_inflationary_tax(
 
 
 def calculate_partial_exemption(sale_amount: float, ceiling: float) -> float:
-    """Calculate partial exemption when sale exceeds ceiling.
+    """Calculate partial exemption ratio when sale exceeds ceiling.
 
-    Formula: exempt_amount = ceiling - (ceiling - value_at_ceiling) * excess_ratio
-    Simplified: the portion up to ceiling is exempt, above is taxable.
-    Linear formula: exempt = (ceiling / sale_amount) * sale_amount
-    Actually: if sale > ceiling, exempt_amount = ceiling, taxable = sale - ceiling.
+    Formula per Section 49א(א1): the exempt portion of shevach is
+    (ceiling / sale_amount). Returns the RATIO to multiply by shevach.
     """
     if sale_amount <= ceiling:
-        return sale_amount  # Fully exempt
+        return 1.0  # Fully exempt (ratio = 100%)
 
-    # Partial: only ceiling amount is exempt
-    return ceiling
+    # Partial: exempt ratio = ceiling / sale_amount
+    return ceiling / sale_amount

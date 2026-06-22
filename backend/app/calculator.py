@@ -16,7 +16,7 @@ Implements:
 
 from datetime import date
 
-from app.boi_api import ILP_TO_ILS, ILR_TO_ILS
+from app.boi_api import ILP_TO_ILS, ILR_TO_ILS, fetch_exchange_rate_sync
 from app.cpi_data import get_cpi_for_year, get_indexation_ratio
 from app.depreciation import calculate_depreciation
 from app.models import (
@@ -67,9 +67,31 @@ def _convert_to_ils_static(amount: float | None, currency: Currency) -> float:
     return amount
 
 
+def _convert_to_ils_with_date(amount: float | None, currency: Currency, acq_date: date) -> float:
+    """Convert amount to ILS using Bank of Israel historical rate for the given date.
+
+    Falls back to treating as ILS if rate unavailable.
+    """
+    if amount is None:
+        return 0.0
+    if currency == Currency.ILS:
+        return amount
+    if currency == Currency.ILP:
+        return amount * ILP_TO_ILS
+    if currency == Currency.ILR:
+        return amount * ILR_TO_ILS
+
+    # Fetch historical rate from Bank of Israel
+    rate = fetch_exchange_rate_sync(currency, acq_date)
+    if rate is not None:
+        return amount * rate
+    # Fallback: return as-is
+    return amount
+
+
 def _index_acquisition(acq: AcquisitionPart, sale_year: int) -> float:
     """Index a single acquisition part from its own date to sale year."""
-    amount_ils = _convert_to_ils_static(acq.amount, acq.currency)
+    amount_ils = _convert_to_ils_with_date(acq.amount, acq.currency, acq.acquisition_date)
     ratio = get_indexation_ratio(acq.acquisition_date.year, sale_year)
     return amount_ils * ratio
 
@@ -191,12 +213,12 @@ def calculate_prisa(
 ) -> PrisaResult:
     """Calculate tax with prisa (spreading) over num_years.
 
+    Per Section 48ב, during prisa the shevach is treated as EARNED income,
+    so regular marginal brackets (10%, 14%, 20%...) apply with credit points.
+
     For each year:
     - If year is in max_years: tax = min(calculated, base_rate * spread amount)
     - Otherwise: use marginal brackets with given income
-
-    Credit points are applied for all sellers when using marginal brackets
-    (not just over-60).
     """
     if num_years <= 0:
         return PrisaResult(
@@ -224,11 +246,13 @@ def calculate_prisa(
             other_income = 0.0
         else:
             other_income = annual_incomes.get(year, 0.0)
+            # Per Section 48ב: during prisa, shevach is treated as earned income
+            # Use marginal brackets (is_over_60=True gives full marginal brackets)
             year_tax = calculate_tax_on_income(
                 taxable_income=spread_per_year,
                 other_income=other_income,
                 year=year,
-                is_over_60=is_over_60,
+                is_over_60=True,  # Marginal brackets apply to ALL sellers during prisa
             )
             # Cap: never exceed base_rate
             max_tax = spread_per_year * base_rate
@@ -305,7 +329,7 @@ def calculate_transaction(txn: TransactionInput) -> CalculationResult:
     # Each acquisition is indexed from its own date
     acquisition_indexed = sum(_index_acquisition(a, sale_year) for a in txn.acquisitions)
     total_acquisition_ils = sum(
-        _convert_to_ils_static(a.amount, a.currency) for a in txn.acquisitions
+        _convert_to_ils_with_date(a.amount, a.currency, a.acquisition_date) for a in txn.acquisitions
     )
 
     # --- FIX #1: Per-deduction indexation ---
@@ -334,7 +358,7 @@ def calculate_transaction(txn: TransactionInput) -> CalculationResult:
     # Inflationary amount (sum of per-acquisition inflationary gains)
     inflationary = 0.0
     for acq in txn.acquisitions:
-        acq_ils = _convert_to_ils_static(acq.amount, acq.currency)
+        acq_ils = _convert_to_ils_with_date(acq.amount, acq.currency, acq.acquisition_date)
         ratio = get_indexation_ratio(acq.acquisition_date.year, sale_year)
         if ratio > 1:
             inflationary += acq_ils * (ratio - 1)
@@ -357,16 +381,17 @@ def calculate_transaction(txn: TransactionInput) -> CalculationResult:
 
     # --- FIX #14: Partial exemption ---
     is_exempt = False
-    partial_exemption_amount = 0.0
+    partial_exemption_ratio = 0.0
     if txn.exemption.is_single_apartment and txn.exemption.ownership_months >= 18:
         if sale_amount <= EXEMPTION_49B2_CEILING:
             is_exempt = True
         else:
-            # Partial exemption: exempt up to ceiling
-            partial_exemption_amount = calculate_partial_exemption(sale_amount, EXEMPTION_49B2_CEILING)
+            # Partial exemption: exempt_ratio = ceiling / sale_amount
+            partial_exemption_ratio = calculate_partial_exemption(sale_amount, EXEMPTION_49B2_CEILING)
 
     # --- FIX #5: Linear qualification check ---
-    is_linear_eligible = txn.is_residential
+    # Linear mutav (תיקון 76) requires: residential property AND acquired before 1.1.2014
+    is_linear_eligible = txn.is_residential and earliest_acquisition < DATE_2014_01_01
 
     # Route taxes
     if is_linear_eligible:
@@ -384,15 +409,19 @@ def calculate_transaction(txn: TransactionInput) -> CalculationResult:
 
         # --- FIX #15: Non-resident tax ---
         if not seller.is_israeli_resident:
+            # Non-residents get 25% flat, but can still use linear for pre-2014 acquisitions
             seller_tax_non_resident = calculate_non_resident_tax(seller_real_shevach)
-            seller_tax_linear = seller_tax_non_resident
+            if is_linear_eligible:
+                seller_tax_linear = min(tax_linear * share, seller_tax_non_resident)
+            else:
+                seller_tax_linear = seller_tax_non_resident
             seller_tax_regular = seller_tax_non_resident
         else:
             seller_tax_linear = tax_linear * share
             seller_tax_regular = tax_regular * share
 
         # --- FIX #9: Prisa on both linear and regular routes ---
-        seller_birth_year = seller.birth_date.year
+        seller_birth_year = seller.birth_date.year if seller.birth_date else sale_year - 45  # Default age ~45 if unknown
         best_prisa: PrisaResult | None = None
         prisa_comparison: list[PrisaResult] = []
 
@@ -485,7 +514,7 @@ def calculate_transaction(txn: TransactionInput) -> CalculationResult:
                 recommended_route=recommended,
                 prisa_result=best_prisa,
                 depreciation_amount=depreciation_amount * share,
-                partial_exemption_amount=partial_exemption_amount * share,
+                partial_exemption_amount=partial_exemption_ratio * seller_real_shevach,
                 cpi_acquisition=cpi_acq,
                 cpi_sale=cpi_sale,
                 indexation_ratio=indexation_ratio,

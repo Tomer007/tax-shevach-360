@@ -429,6 +429,12 @@ body {
   font-size: 0.6rem;
 }
 
+.step-contract-badge {
+  font-size: 0.6rem;
+  margin-inline-start: 2px;
+  opacity: 0.7;
+}
+
 /* Results */
 .result-summary {
   display: grid;
@@ -1211,6 +1217,53 @@ body {
 .extracted-details {
   animation: cardEnter 0.2s ease forwards;
   opacity: 0;
+}
+
+/* Editable extracted fields */
+.extracted-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.extracted-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.extracted-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.extracted-input.sm {
+  max-width: 160px;
+}
+
+.extracted-input.xs {
+  max-width: 70px;
+}
+
+.extracted-textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.extracted-seller-edit {
+  margin-bottom: 8px;
+}
+
+.extracted-edit-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 640px) {

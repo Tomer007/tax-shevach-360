@@ -28,7 +28,22 @@ client.interceptors.response.use(
 )
 
 export async function calculateTax(input: TransactionInput): Promise<CalculationResult> {
-  const { data } = await client.post<CalculationResult>('/calculate-and-notify', input)
+  // Validate required fields before sending
+  for (const acq of input.acquisitions) {
+    if (!acq.acquisition_date) {
+      throw new Error('חסר תאריך רכישה. יש למלא את תאריך הרכישה המקורי.')
+    }
+  }
+
+  // Sanitize: convert empty date strings to null for optional fields
+  const sanitized = {
+    ...input,
+    sellers: input.sellers.map(s => ({
+      ...s,
+      birth_date: s.birth_date || null,
+    })),
+  }
+  const { data } = await client.post<CalculationResult>('/calculate-and-notify', sanitized)
   return data
 }
 

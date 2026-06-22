@@ -72,6 +72,11 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       })
 
       setExtractedData(data)
+
+      // Auto-approve if confidence is high and critical fields are present
+      if (data.confidence === 'high' && data.sale_amount && data.sale_date) {
+        autoApprove(data)
+      }
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.data?.detail) {
         setError(err.response.data.detail)
@@ -87,6 +92,14 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
   function getMissingFields(): MissingField[] {
     if (!extractedData) return []
     const missing: MissingField[] = []
+
+    // Critical: sale amount and date
+    if (!extractedData.sale_date) {
+      missing.push({ field: 'sale_date', label: 'תאריך מכירה', critical: true })
+    }
+    if (!extractedData.sale_amount) {
+      missing.push({ field: 'sale_amount', label: 'סכום המכירה', critical: true })
+    }
 
     // Only flag fields the user needs to be aware they must fill
     if (!extractedData.sellers?.length) {
@@ -105,22 +118,41 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     return missing
   }
 
-  function handleApprove() {
-    if (!extractedData) return
+  function autoApprove(data: ExtractedData) {
+    const partial = buildPartial(data)
+    if (partial) {
+      setApproved(true)
+      setShowDetails(false)
+      onDataExtracted(partial)
+    }
+  }
+
+  function buildPartial(data: ExtractedData): Partial<TransactionInput> | null {
+    if (!data.sale_amount || !data.sale_date) return null
 
     const partial: Partial<TransactionInput> = {}
 
-    // Sale details
-    if (extractedData.sale_date) partial.sale_date = extractedData.sale_date
-    if (extractedData.sale_amount) partial.sale_amount = Number(extractedData.sale_amount)
-    if (extractedData.sale_currency) partial.sale_currency = extractedData.sale_currency as TransactionInput['sale_currency']
+    const d = data.sale_date.trim()
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      partial.sale_date = d
+    } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) {
+      const [dd, mm, yyyy] = d.split('/')
+      partial.sale_date = `${yyyy}-${mm}-${dd}`
+    } else if (/^\d{2}\.\d{2}\.\d{4}$/.test(d)) {
+      const [dd, mm, yyyy] = d.split('.')
+      partial.sale_date = `${yyyy}-${mm}-${dd}`
+    } else {
+      partial.sale_date = d
+    }
 
-    // Sellers
-    if (extractedData.sellers?.length) {
-      partial.sellers = extractedData.sellers.map((s) => ({
+    partial.sale_amount = Number(data.sale_amount)
+    if (data.sale_currency) partial.sale_currency = data.sale_currency as TransactionInput['sale_currency']
+
+    if (data.sellers?.length) {
+      partial.sellers = data.sellers.map((s) => ({
         name: String(s.name || ''),
         id_number: String(s.id_number || ''),
-        birth_date: String(s.birth_date || ''),
+        birth_date: s.birth_date || '',
         share_percent: Number(s.share_percent) || 100,
         is_israeli_resident: s.is_israeli_resident !== false,
         marital_status: 'single',
@@ -129,9 +161,8 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       }))
     }
 
-    // Acquisitions
-    if (extractedData.acquisitions?.length) {
-      partial.acquisitions = extractedData.acquisitions.map((a) => ({
+    if (data.acquisitions?.length) {
+      partial.acquisitions = data.acquisitions.map((a) => ({
         acquisition_date: String(a.acquisition_date || ''),
         acquisition_type: String(a.acquisition_type || 'purchase') as 'purchase' | 'inheritance' | 'gift' | 'divorce',
         amount: Number(a.amount) || 0,
@@ -139,14 +170,43 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
         share_percent: Number(a.share_percent) || 100,
         deceased_eligible_for_exemption: false,
       }))
+    } else {
+      // No acquisition data in contract - leave empty for user to fill
+      partial.acquisitions = [{
+        acquisition_date: '',
+        acquisition_type: 'purchase' as const,
+        amount: 0,
+        currency: (data.sale_currency || 'ILS') as TransactionInput['sale_currency'],
+        share_percent: 100,
+        deceased_eligible_for_exemption: false,
+      }]
     }
 
-    // Property type → is_residential
-    if (extractedData.property_type) {
-      partial.is_residential = extractedData.property_type === 'apartment' || extractedData.property_type === 'house'
+    if (data.property_type) {
+      partial.is_residential = data.property_type === 'apartment' || data.property_type === 'house'
     }
 
+    return partial
+  }
+
+  function handleApprove() {
+    if (!extractedData) return
+
+    console.log('[UploadContract] handleApprove called, extractedData:', JSON.stringify(extractedData, null, 2))
+
+    // If critical fields are missing, expand details so user can fill them
+    if (!extractedData.sale_amount || !extractedData.sale_date) {
+      console.log('[UploadContract] Missing critical fields - sale_amount:', extractedData.sale_amount, 'sale_date:', extractedData.sale_date)
+      setShowDetails(true)
+      return
+    }
+
+    const partial = buildPartial(extractedData)
+    if (!partial) return
+
+    console.log('[UploadContract] Sending to form:', JSON.stringify(partial, null, 2))
     setApproved(true)
+    setShowDetails(false)
     onDataExtracted(partial)
   }
 
@@ -160,18 +220,6 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
     c === 'high' ? 'גבוהה ✓' : c === 'medium' ? 'בינונית ⚠' : c === 'failed' ? 'נכשל ✗' : 'נמוכה'
   const confidenceColor = (c: string) =>
     c === 'high' ? 'var(--success)' : c === 'medium' ? '#fbbf24' : '#f87171'
-
-  const propertyTypeLabel = (t: string | null) => {
-    if (!t) return '—'
-    const map: Record<string, string> = { apartment: 'דירה', house: 'בית', land: 'מגרש', commercial: 'מסחרי', other: 'אחר' }
-    return map[t] || t
-  }
-
-  const acquisitionTypeLabel = (t: string | undefined) => {
-    if (!t) return '—'
-    const map: Record<string, string> = { purchase: 'רכישה', inheritance: 'ירושה', gift: 'מתנה', divorce: 'גירושין' }
-    return map[t] || t
-  }
 
   const missingFields = extractedData ? getMissingFields() : []
   const criticalMissing = missingFields.filter(f => f.critical)
@@ -208,50 +256,63 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
       {/* Extracted Results Panel */}
       {extractedData && (
         <div className="extracted-results" role="region" aria-label="נתונים שחולצו מהחוזה">
-          <div className="extracted-header">
+          <div className="extracted-header" onClick={() => approved && setShowDetails(!showDetails)} style={approved ? { cursor: 'pointer' } : undefined}>
             <h3>📋 נתונים שחולצו מהחוזה</h3>
             <div className="extracted-badge" style={{ color: confidenceColor(extractedData.confidence) }}>
               רמת דיוק: {confidenceLabel(extractedData.confidence)}
             </div>
           </div>
 
-          {/* Quick summary - always visible */}
-          <div className="extracted-summary">
-            {extractedData.sale_date && <span className="extracted-chip">📅 {extractedData.sale_date}</span>}
-            {extractedData.sale_amount && <span className="extracted-chip success">💰 ₪{extractedData.sale_amount.toLocaleString()}</span>}
-            {extractedData.sellers.length > 0 && <span className="extracted-chip">👤 {extractedData.sellers.length} מוכרים</span>}
-            {extractedData.buyers && extractedData.buyers.length > 0 && <span className="extracted-chip">🏠 {extractedData.buyers.length} קונים</span>}
-            {extractedData.property_address && <span className="extracted-chip">📍 {extractedData.property_address}</span>}
-          </div>
-
-          {/* Missing Fields Warning */}
-          {missingFields.length > 0 && !approved && (
-            <div className="extracted-missing" role="alert">
-              <div className="extracted-missing-header">
-                ⚠️ שדות שיש למלא ידנית בטופס:
+          {/* When approved, show collapsed summary with expand option */}
+          {approved && !showDetails && (
+            <div className="extracted-footer">
+              <span className="extracted-approved">✓ הנתונים אושרו ומולאו בטופס</span>
+              <div className="extracted-actions">
+                <button className="btn btn-sm btn-secondary" onClick={() => setShowDetails(true)} type="button">✏️ ערוך</button>
               </div>
-              {criticalMissing.length > 0 && (
-                <ul className="extracted-missing-list critical">
-                  {criticalMissing.map(f => (
-                    <li key={f.field}>
-                      <span className="missing-dot critical" />
-                      {f.label} <span className="missing-tag">חובה</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {optionalMissing.length > 0 && (
-                <ul className="extracted-missing-list optional">
-                  {optionalMissing.map(f => (
-                    <li key={f.field}>
-                      <span className="missing-dot optional" />
-                      {f.label} <span className="missing-tag optional">אופציונלי</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           )}
+
+          {/* Full content - shown when not yet approved, or when expanded */}
+          {(!approved || showDetails) && (
+            <>
+              {/* Quick summary - always visible */}
+              <div className="extracted-summary">
+                {extractedData.sale_date && <span className="extracted-chip">📅 {extractedData.sale_date}</span>}
+                {extractedData.sale_amount && <span className="extracted-chip success">💰 ₪{extractedData.sale_amount.toLocaleString()}</span>}
+                {extractedData.sellers.length > 0 && <span className="extracted-chip">👤 {extractedData.sellers.length} מוכרים</span>}
+                {extractedData.buyers && extractedData.buyers.length > 0 && <span className="extracted-chip">🏠 {extractedData.buyers.length} קונים</span>}
+                {extractedData.property_address && <span className="extracted-chip">📍 {extractedData.property_address}</span>}
+              </div>
+
+              {/* Missing Fields Warning */}
+              {missingFields.length > 0 && !approved && (
+                <div className="extracted-missing" role="alert">
+                  <div className="extracted-missing-header">
+                    ⚠️ שדות שיש למלא ידנית בטופס:
+                  </div>
+                  {criticalMissing.length > 0 && (
+                    <ul className="extracted-missing-list critical">
+                      {criticalMissing.map(f => (
+                        <li key={f.field}>
+                          <span className="missing-dot critical" />
+                          {f.label} <span className="missing-tag">חובה</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {optionalMissing.length > 0 && (
+                    <ul className="extracted-missing-list optional">
+                      {optionalMissing.map(f => (
+                        <li key={f.field}>
+                          <span className="missing-dot optional" />
+                          {f.label} <span className="missing-tag optional">אופציונלי</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
           {/* Toggle Details Button */}
           <button
@@ -259,111 +320,245 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
             onClick={() => setShowDetails(!showDetails)}
             type="button"
           >
-            {showDetails ? '▲ הסתר פרטים' : '▼ הצג את כל השדות שחולצו'}
+            {showDetails ? '▲ הסתר פרטים' : '▼ הצג ועדכן שדות'}
           </button>
 
-          {/* Detailed Fields - collapsible */}
+          {/* Editable Fields - collapsible */}
           {showDetails && (
             <div className="extracted-details">
-              {/* Sale Details */}
+              {/* Sale Details - Editable */}
               <div className="extracted-grid">
-                {extractedData.sale_date && (
-                  <div className="extracted-item">
-                    <span className="extracted-label">תאריך מכירה</span>
-                    <span className="extracted-value">{extractedData.sale_date}</span>
-                  </div>
-                )}
-                {extractedData.sale_amount && (
-                  <div className="extracted-item">
-                    <span className="extracted-label">סכום מכירה</span>
-                    <span className="extracted-value extracted-amount">₪{extractedData.sale_amount.toLocaleString()}</span>
-                  </div>
-                )}
-                {extractedData.property_type && (
-                  <div className="extracted-item">
-                    <span className="extracted-label">סוג נכס</span>
-                    <span className="extracted-value">{propertyTypeLabel(extractedData.property_type)}</span>
-                  </div>
-                )}
-                {extractedData.sale_currency && (
-                  <div className="extracted-item">
-                    <span className="extracted-label">מטבע</span>
-                    <span className="extracted-value">{extractedData.sale_currency}</span>
-                  </div>
-                )}
-                {extractedData.property_address && (
-                  <div className="extracted-item full">
-                    <span className="extracted-label">כתובת</span>
-                    <span className="extracted-value">{extractedData.property_address}</span>
-                  </div>
-                )}
-                {extractedData.block_parcel && (
-                  <div className="extracted-item">
-                    <span className="extracted-label">גוש/חלקה</span>
-                    <span className="extracted-value">{extractedData.block_parcel}</span>
-                  </div>
-                )}
+                <div className="extracted-item">
+                  <label className="extracted-label" htmlFor="ext-sale-date">תאריך מכירה</label>
+                  <input
+                    id="ext-sale-date"
+                    type="date"
+                    className="extracted-input"
+                    value={extractedData.sale_date || ''}
+                    onChange={(e) => setExtractedData({ ...extractedData, sale_date: e.target.value || null })}
+                  />
+                </div>
+                <div className="extracted-item">
+                  <label className="extracted-label" htmlFor="ext-sale-amount">סכום מכירה (ש״ח)</label>
+                  <input
+                    id="ext-sale-amount"
+                    type="number"
+                    className="extracted-input"
+                    min={0}
+                    value={extractedData.sale_amount ?? ''}
+                    onChange={(e) => setExtractedData({ ...extractedData, sale_amount: e.target.value ? Number(e.target.value) : null })}
+                    placeholder="הזן סכום"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="extracted-item">
+                  <label className="extracted-label" htmlFor="ext-property-type">סוג נכס</label>
+                  <select
+                    id="ext-property-type"
+                    className="extracted-input"
+                    value={extractedData.property_type || ''}
+                    onChange={(e) => setExtractedData({ ...extractedData, property_type: e.target.value || null })}
+                  >
+                    <option value="">—</option>
+                    <option value="apartment">דירה</option>
+                    <option value="house">בית</option>
+                    <option value="land">מגרש</option>
+                    <option value="commercial">מסחרי</option>
+                    <option value="other">אחר</option>
+                  </select>
+                </div>
+                <div className="extracted-item">
+                  <label className="extracted-label" htmlFor="ext-currency">מטבע</label>
+                  <select
+                    id="ext-currency"
+                    className="extracted-input"
+                    value={extractedData.sale_currency || 'ILS'}
+                    onChange={(e) => setExtractedData({ ...extractedData, sale_currency: e.target.value })}
+                  >
+                    <option value="ILS">₪ שקל</option>
+                    <option value="USD">$ דולר</option>
+                    <option value="EUR">€ אירו</option>
+                  </select>
+                </div>
+                <div className="extracted-item full">
+                  <label className="extracted-label" htmlFor="ext-address">כתובת</label>
+                  <input
+                    id="ext-address"
+                    type="text"
+                    className="extracted-input"
+                    value={extractedData.property_address || ''}
+                    onChange={(e) => setExtractedData({ ...extractedData, property_address: e.target.value || null })}
+                    placeholder="כתובת הנכס"
+                  />
+                </div>
+                <div className="extracted-item">
+                  <label className="extracted-label" htmlFor="ext-block-parcel">גוש/חלקה</label>
+                  <input
+                    id="ext-block-parcel"
+                    type="text"
+                    className="extracted-input"
+                    value={extractedData.block_parcel || ''}
+                    onChange={(e) => setExtractedData({ ...extractedData, block_parcel: e.target.value || null })}
+                    placeholder="גוש/חלקה"
+                  />
+                </div>
               </div>
 
-              {/* Sellers */}
-              {extractedData.sellers.length > 0 && (
-                <div className="extracted-section">
-                  <span className="extracted-section-title">מוכרים ({extractedData.sellers.length})</span>
-                  {extractedData.sellers.map((s, i) => (
-                    <div key={i} className="extracted-seller">
-                      <span>{s.name || '—'}</span>
-                      <span className="extracted-dim">ת״ז {s.id_number || '—'}</span>
-                      <span className="extracted-badge-sm">{s.share_percent || 100}%</span>
-                      {!s.birth_date && <span className="missing-inline">חסר: ת. לידה</span>}
+              {/* Sellers - Editable */}
+              <div className="extracted-section">
+                <span className="extracted-section-title">מוכרים ({extractedData.sellers.length})</span>
+                {extractedData.sellers.map((s, i) => (
+                  <div key={i} className="extracted-seller-edit">
+                    <div className="extracted-edit-row">
+                      <input
+                        type="text"
+                        className="extracted-input"
+                        value={s.name || ''}
+                        onChange={(e) => {
+                          const updated = [...extractedData.sellers]
+                          updated[i] = { ...updated[i], name: e.target.value }
+                          setExtractedData({ ...extractedData, sellers: updated })
+                        }}
+                        placeholder="שם מוכר"
+                      />
+                      <input
+                        type="text"
+                        className="extracted-input sm"
+                        value={s.id_number || ''}
+                        onChange={(e) => {
+                          const updated = [...extractedData.sellers]
+                          updated[i] = { ...updated[i], id_number: e.target.value }
+                          setExtractedData({ ...extractedData, sellers: updated })
+                        }}
+                        placeholder="ת״ז"
+                      />
+                      <input
+                        type="number"
+                        className="extracted-input xs"
+                        min={0}
+                        max={100}
+                        value={s.share_percent ?? 100}
+                        onChange={(e) => {
+                          const updated = [...extractedData.sellers]
+                          updated[i] = { ...updated[i], share_percent: Number(e.target.value) }
+                          setExtractedData({ ...extractedData, sellers: updated })
+                        }}
+                        placeholder="%"
+                      />
+                      <input
+                        type="date"
+                        className="extracted-input sm"
+                        value={s.birth_date || ''}
+                        onChange={(e) => {
+                          const updated = [...extractedData.sellers]
+                          updated[i] = { ...updated[i], birth_date: e.target.value }
+                          setExtractedData({ ...extractedData, sellers: updated })
+                        }}
+                        title="תאריך לידה"
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
 
-              {/* Buyers */}
+              {/* Buyers - Editable */}
               {extractedData.buyers && extractedData.buyers.length > 0 && (
                 <div className="extracted-section">
                   <span className="extracted-section-title">קונים ({extractedData.buyers.length})</span>
                   {extractedData.buyers.map((b, i) => (
-                    <div key={i} className="extracted-seller">
-                      <span>{b.name || '—'}</span>
-                      <span className="extracted-dim">ת״ז {b.id_number || '—'}</span>
+                    <div key={i} className="extracted-seller-edit">
+                      <div className="extracted-edit-row">
+                        <input
+                          type="text"
+                          className="extracted-input"
+                          value={b.name || ''}
+                          onChange={(e) => {
+                            const updated = [...extractedData.buyers]
+                            updated[i] = { ...updated[i], name: e.target.value }
+                            setExtractedData({ ...extractedData, buyers: updated })
+                          }}
+                          placeholder="שם קונה"
+                        />
+                        <input
+                          type="text"
+                          className="extracted-input sm"
+                          value={b.id_number || ''}
+                          onChange={(e) => {
+                            const updated = [...extractedData.buyers]
+                            updated[i] = { ...updated[i], id_number: e.target.value }
+                            setExtractedData({ ...extractedData, buyers: updated })
+                          }}
+                          placeholder="ת״ז"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Acquisitions */}
+              {/* Acquisitions - Editable */}
               {extractedData.acquisitions.length > 0 && (
                 <div className="extracted-section">
                   <span className="extracted-section-title">רכישה מקורית</span>
                   {extractedData.acquisitions.map((a, i) => (
-                    <div key={i} className="extracted-seller">
-                      <span>{a.acquisition_date || '—'}</span>
-                      <span>{acquisitionTypeLabel(a.acquisition_type)}</span>
-                      <span className="extracted-amount">
-                        {a.amount ? `₪${a.amount.toLocaleString()}` : <span className="missing-inline">חסר: סכום רכישה</span>}
-                      </span>
+                    <div key={i} className="extracted-seller-edit">
+                      <div className="extracted-edit-row">
+                        <input
+                          type="date"
+                          className="extracted-input sm"
+                          value={a.acquisition_date || ''}
+                          onChange={(e) => {
+                            const updated = [...extractedData.acquisitions]
+                            updated[i] = { ...updated[i], acquisition_date: e.target.value }
+                            setExtractedData({ ...extractedData, acquisitions: updated })
+                          }}
+                          title="תאריך רכישה"
+                        />
+                        <select
+                          className="extracted-input sm"
+                          value={a.acquisition_type || 'purchase'}
+                          onChange={(e) => {
+                            const updated = [...extractedData.acquisitions]
+                            updated[i] = { ...updated[i], acquisition_type: e.target.value }
+                            setExtractedData({ ...extractedData, acquisitions: updated })
+                          }}
+                        >
+                          <option value="purchase">רכישה</option>
+                          <option value="inheritance">ירושה</option>
+                          <option value="gift">מתנה</option>
+                          <option value="divorce">גירושין</option>
+                        </select>
+                        <input
+                          type="number"
+                          className="extracted-input sm"
+                          min={0}
+                          value={a.amount ?? ''}
+                          onChange={(e) => {
+                            const updated = [...extractedData.acquisitions]
+                            updated[i] = { ...updated[i], amount: e.target.value ? Number(e.target.value) : null }
+                            setExtractedData({ ...extractedData, acquisitions: updated })
+                          }}
+                          placeholder="סכום רכישה"
+                          inputMode="numeric"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Payment Schedule */}
-              {extractedData.payment_schedule && (
-                <div className="extracted-section">
-                  <span className="extracted-section-title">לוח תשלומים</span>
-                  <div className="extracted-notes">{extractedData.payment_schedule}</div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {extractedData.notes && (
-                <div className="extracted-section">
-                  <span className="extracted-section-title">הערות</span>
-                  <div className="extracted-notes">{extractedData.notes}</div>
-                </div>
-              )}
+              {/* Notes - Editable */}
+              <div className="extracted-section">
+                <label className="extracted-section-title" htmlFor="ext-notes">הערות</label>
+                <textarea
+                  id="ext-notes"
+                  className="extracted-input extracted-textarea"
+                  value={extractedData.notes || ''}
+                  onChange={(e) => setExtractedData({ ...extractedData, notes: e.target.value || null })}
+                  rows={2}
+                  placeholder="הערות נוספות"
+                />
+              </div>
             </div>
           )}
 
@@ -383,14 +578,18 @@ export default function UploadContract({ token, onDataExtracted }: Props) {
               </>
             ) : (
               <>
-                <span className="extracted-approved">✓ הנתונים אושרו ומולאו בטופס</span>
-                {missingFields.length > 0 && (
-                  <span className="extracted-dim">השלם את השדות החסרים בטופס למטה</span>
-                )}
-                <button className="btn btn-sm btn-secondary" onClick={handleDismiss} type="button">הסתר</button>
+                <span className="extracted-approved">✓ הנתונים עודכנו</span>
+                <div className="extracted-actions">
+                  <button className="btn btn-primary btn-sm" onClick={handleApprove} type="button">
+                    ↻ עדכן בטופס
+                  </button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => setShowDetails(false)} type="button">סגור</button>
+                </div>
               </>
             )}
           </div>
+            </>
+          )}
         </div>
       )}
 
