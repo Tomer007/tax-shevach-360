@@ -173,12 +173,22 @@ async def upload_contract(
                 # Smart parser: try anyway with whatever text we have
                 if text.strip():
                     logger.info(f"Smart parser attempting with low-quality text: {file.filename}")
-                    # Don't return early — let it fall through to the text parsing below
+                    result = parse_contract_regex(text)
+                    if result.confidence == "failed" or (not result.sale_date and not result.sale_amount):
+                        # Smart parser couldn't extract anything useful — return clear message
+                        return ParsedContract(
+                            confidence="failed",
+                            notes="הניתוח החכם לא הצליח לחלץ נתונים מה-PDF. הקובץ נראה כסרוק — נסה את מצב AI.",
+                        )
+                    # Cache and return
+                    if len(_parse_cache) >= MAX_CACHE_SIZE:
+                        _parse_cache.pop(next(iter(_parse_cache)))
+                    _parse_cache[file_hash] = result
+                    return result
                 else:
-                    # Truly no text at all
                     return ParsedContract(
                         confidence="failed",
-                        notes="לא ניתן לחלץ טקסט מה-PDF. נסה AI.",
+                        notes="לא ניתן לחלץ טקסט מה-PDF. הקובץ נראה כסרוק — נסה את מצב AI.",
                     )
             logger.info(f"{'No text layer' if not text.strip() else 'Poor text quality'} in PDF, using Vision for {file.filename}")
             try:

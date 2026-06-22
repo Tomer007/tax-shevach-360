@@ -156,6 +156,25 @@ def _extract_names_near_ids(text: str, ids: list[dict], markers: list[str]) -> l
     return persons
 
 
+def _preprocess_text(text: str) -> str:
+    """Preprocess extracted PDF text to handle common issues."""
+    # Remove excessive whitespace
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'[ \t]+', ' ', text)
+
+    # Check if text might be reversed (common in some PDF extractors)
+    # If we find more RTL markers at end of lines, text might be OK
+    # If Hebrew chars exist but no patterns match, try reversing lines
+    lines = text.split('\n')
+    processed_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped:
+            processed_lines.append(stripped)
+
+    return '\n'.join(processed_lines)
+
+
 def parse_contract_regex(text: str) -> ParsedContract:
     """Parse contract using regex/rule-based extraction.
 
