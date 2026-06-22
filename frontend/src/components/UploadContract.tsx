@@ -38,7 +38,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [approved, setApproved] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
-  const [parserMode, setParserMode] = useState<'ai' | 'local'>('ai')
+  const [parserMode, setParserMode] = useState<'ai' | 'local' | 'smart'>('ai')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
@@ -254,11 +254,12 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
         <select
           className="parser-select"
           value={parserMode}
-          onChange={(e) => setParserMode(e.target.value as 'ai' | 'local')}
+          onChange={(e) => setParserMode(e.target.value as 'ai' | 'local' | 'smart')}
           title="בחר מנוע ניתוח"
         >
           <option value="ai">🌐 AI (OpenAI)</option>
-          <option value="local">💻 מודל מקומי</option>
+          <option value="smart">⚡ ניתוח חכם</option>
+          <option value="local">💻 Ollama</option>
         </select>
         <input
           ref={fileRef}

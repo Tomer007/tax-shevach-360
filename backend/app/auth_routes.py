@@ -23,6 +23,7 @@ from app.auth import (
 from app.contract_parser import ParsedContract, parse_contract_text, parse_contract_images
 from app.email_service import send_contract_result_email
 from app.local_parser import parse_contract_text_local, parse_contract_images_local, is_ollama_available
+from app.regex_parser import parse_contract_regex
 from app.models import TransactionInput
 
 logger = logging.getLogger(__name__)
@@ -98,12 +99,13 @@ def get_me(current_user: dict = Depends(get_current_user)):
 
 @router.get("/parser-options")
 def get_parser_options():
-    """Get available parser options (AI vs local)."""
+    """Get available parser options (AI vs local vs smart)."""
     ollama_available = is_ollama_available()
     return {
         "options": [
             {"id": "ai", "label": "AI (OpenAI)", "available": True, "description": "GPT-4o — דיוק גבוה, דורש חיבור לאינטרנט"},
-            {"id": "local", "label": "מודל מקומי (Ollama)", "available": ollama_available, "description": "Llama — ללא עלות, רץ על המחשב המקומי"},
+            {"id": "smart", "label": "ניתוח חכם (מקומי)", "available": True, "description": "חילוץ מבוסס חוקים — מהיר, ללא עלות, עובד אופליין"},
+            {"id": "local", "label": "Ollama (LLM מקומי)", "available": ollama_available, "description": "Llama — ללא עלות, דורש התקנת Ollama"},
         ],
         "default": "ai",
     }
@@ -113,14 +115,15 @@ def get_parser_options():
 async def upload_contract(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    parser: str = "ai",  # "ai" (OpenAI) or "local" (Ollama)
+    parser: str = "ai",  # "ai" (OpenAI) or "local" (Ollama) or "smart" (regex)
 ):
     """Upload a contract document and extract transaction details using AI.
 
     Accepts PDF or text files. Requires authentication.
-    Query param `parser`: "ai" for OpenAI (default), "local" for Ollama.
+    Query param `parser`: "ai" for OpenAI (default), "local" for Ollama, "smart" for regex.
     """
     use_local = parser.lower() == "local"
+    use_smart = parser.lower() == "smart"
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
@@ -166,6 +169,17 @@ async def upload_contract(
 
         # If no text extracted OR text quality is poor, use OpenAI Vision
         if not text.strip() or not text_quality_ok:
+            if use_smart:
+                # Smart parser: try anyway with whatever text we have
+                if text.strip():
+                    logger.info(f"Smart parser attempting with low-quality text: {file.filename}")
+                    # Don't return early — let it fall through to the text parsing below
+                else:
+                    # Truly no text at all
+                    return ParsedContract(
+                        confidence="failed",
+                        notes="לא ניתן לחלץ טקסט מה-PDF. נסה AI.",
+                    )
             logger.info(f"{'No text layer' if not text.strip() else 'Poor text quality'} in PDF, using Vision for {file.filename}")
             try:
 
@@ -224,7 +238,9 @@ async def upload_contract(
     text_for_parsing = text[:30_000]
 
     try:
-        if use_local:
+        if use_smart:
+            result = parse_contract_regex(text_for_parsing)
+        elif use_local:
             result = parse_contract_text_local(text_for_parsing)
         else:
             result = parse_contract_text(text_for_parsing)

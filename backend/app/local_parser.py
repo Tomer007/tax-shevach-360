@@ -9,7 +9,11 @@ import json
 import logging
 import os
 
-import ollama
+try:
+    import ollama
+    OLLAMA_INSTALLED = True
+except ImportError:
+    OLLAMA_INSTALLED = False
 
 from app.contract_parser import EXTRACTION_PROMPT, ParsedContract
 
@@ -22,6 +26,8 @@ OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 def is_ollama_available() -> bool:
     """Check if Ollama is running and accessible."""
+    if not OLLAMA_INSTALLED:
+        return False
     try:
         client = ollama.Client(host=OLLAMA_HOST)
         client.list()
@@ -36,6 +42,9 @@ def parse_contract_text_local(text: str) -> ParsedContract:
     Uses structured output (JSON mode) for reliable extraction.
     Falls back gracefully if Ollama is not running.
     """
+    if not OLLAMA_INSTALLED:
+        raise ValueError("חבילת ollama לא מותקנת. יש להתקין: pip install ollama")
+
     try:
         client = ollama.Client(host=OLLAMA_HOST)
     except Exception as e:
@@ -111,6 +120,9 @@ def parse_contract_images_local(images_b64: list[str]) -> ParsedContract:
 
     Requires a vision-capable model like llava or llama3.2-vision.
     """
+    if not OLLAMA_INSTALLED:
+        raise ValueError("חבילת ollama לא מותקנת. יש להתקין: pip install ollama")
+
     try:
         client = ollama.Client(host=OLLAMA_HOST)
     except Exception as e:
