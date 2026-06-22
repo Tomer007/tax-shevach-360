@@ -39,6 +39,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
   const [approved, setApproved] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [parserMode, setParserMode] = useState<'ai' | 'local' | 'smart'>('ai')
+  const [uploadedFileName, setUploadedFileName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
@@ -64,6 +65,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
     setExtractedData(null)
     setApproved(false)
     setShowDetails(false)
+    setUploadedFileName(file.name)
 
     const formData = new FormData()
     formData.append('file', file)
@@ -276,6 +278,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
         <div className="extracted-results" role="region" aria-label="נתונים שחולצו מהחוזה">
           <div className="extracted-header" onClick={() => approved && setShowDetails(!showDetails)} style={approved ? { cursor: 'pointer' } : undefined}>
             <h3>📋 נתונים שחולצו מהחוזה</h3>
+            {uploadedFileName && <span className="extracted-dim" style={{ fontSize: '0.75rem' }}>קובץ: {uploadedFileName}</span>}
             <div className="extracted-badge" style={{ color: confidenceColor(extractedData.confidence) }}>
               רמת דיוק: {confidenceLabel(extractedData.confidence)}
             </div>
