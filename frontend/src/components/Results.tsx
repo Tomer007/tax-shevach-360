@@ -525,6 +525,53 @@ export default function Results({ result, onReset }: Props) {
         </div>
       </div>
 
+      {/* INFOGRAPHIC: Transaction Flow - animated */}
+      <div className="card">
+        <h2 className="card-title">📊 תמונת העסקה במבט אחד</h2>
+        <div className="flow-infographic">
+          <div className="flow-node flow-node-sale flow-animate-1">
+            <div className="flow-node-icon">🏠</div>
+            <div className="flow-node-label">סכום מכירה</div>
+            <div className="flow-node-amount">{formatILS(saleAmount)}</div>
+          </div>
+
+          <div className="flow-connector flow-animate-2">
+            <div className="flow-connector-line" />
+            <div className="flow-connector-arrow">→</div>
+          </div>
+
+          <div className="flow-breakdown-col">
+            <div className="flow-node flow-node-cost flow-animate-3">
+              <div className="flow-node-label">עלות מתואמת</div>
+              <div className="flow-node-amount">{formatILS(totalCost)}</div>
+              <div className="flow-node-pct">{costPct.toFixed(0)}%</div>
+            </div>
+            <div className="flow-node flow-node-inflation flow-animate-4">
+              <div className="flow-node-label">סכום אינפלציוני</div>
+              <div className="flow-node-amount">{formatILS(result.full_inflationary)}</div>
+              <div className="flow-node-pct">{inflationPct.toFixed(0)}%</div>
+            </div>
+            <div className="flow-node flow-node-shevach flow-animate-5">
+              <div className="flow-node-label">שבח ריאלי</div>
+              <div className="flow-node-amount">{formatILS(result.full_real_shevach)}</div>
+              <div className="flow-node-pct">{saleAmount > 0 ? (result.full_real_shevach / saleAmount * 100).toFixed(0) : 0}%</div>
+            </div>
+          </div>
+
+          <div className="flow-connector flow-animate-6">
+            <div className="flow-connector-line" />
+            <div className="flow-connector-arrow">→</div>
+          </div>
+
+          <div className="flow-node flow-node-tax flow-animate-7">
+            <div className="flow-node-icon">💰</div>
+            <div className="flow-node-label">מס לתשלום</div>
+            <div className="flow-node-amount flow-node-amount-tax">{formatILS(taxAmount)}</div>
+            <div className="flow-node-pct">{taxPct.toFixed(1)}% מהמכירה</div>
+          </div>
+        </div>
+      </div>
+
       {/* INFOGRAPHIC: Where does the money go? */}
       <div className="card">
         <h2 className="card-title">💸 לאן הולך הכסף?</h2>

@@ -1768,6 +1768,12 @@ body {
   justify-content: center;
   min-width: 2px;
   transition: width var(--duration-slow) var(--ease-out);
+  animation: barGrow 0.8s ease-out 0.3s both;
+}
+
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .infographic-seg span {
@@ -1843,6 +1849,13 @@ body {
   background: linear-gradient(90deg, #6366f1, #8b5cf6);
   border-radius: 6px;
   transition: width var(--duration-slow) var(--ease-out);
+  animation: routeBarGrow 0.7s ease-out both;
+  transform-origin: right;
+}
+
+@keyframes routeBarGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .infographic-route-fill-best {
@@ -1867,6 +1880,12 @@ body {
   border: 1px solid var(--success-border);
   border-radius: var(--radius);
   margin-top: 4px;
+  animation: savingsPop 0.5s ease-out 1s both;
+}
+
+@keyframes savingsPop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .infographic-savings-icon {
@@ -1909,12 +1928,25 @@ body {
   height: 100%;
   background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
   border-radius: 9px;
+  animation: gaugeGrow 1s ease-out 0.3s both;
+  transform-origin: right;
+}
+
+@keyframes gaugeGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .infographic-gauge-marker {
   position: absolute;
   top: -10px;
   transform: translateX(-50%);
+  animation: markerAppear 0.4s ease-out 1.2s both;
+}
+
+@keyframes markerAppear {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .infographic-gauge-marker span {
@@ -1962,5 +1994,172 @@ body {
 
   .infographic-legend {
     gap: 10px;
+  }
+}
+
+/* Flow Infographic - animated transaction flow */
+.flow-infographic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 8px;
+  overflow-x: auto;
+}
+
+.flow-node {
+  text-align: center;
+  padding: 18px 16px;
+  border-radius: var(--radius);
+  min-width: 120px;
+  position: relative;
+}
+
+.flow-node-sale {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.06));
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.flow-node-cost {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.flow-node-inflation {
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+}
+
+.flow-node-shevach {
+  background: rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.flow-node-tax {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.1), rgba(16, 185, 129, 0.06));
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.flow-node-icon {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.flow-node-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.flow-node-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-node-amount-tax {
+  color: var(--success);
+}
+
+.flow-node-pct {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.flow-breakdown-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-breakdown-col .flow-node {
+  padding: 12px 14px;
+  min-width: 110px;
+}
+
+.flow-breakdown-col .flow-node-amount {
+  font-size: 0.88rem;
+}
+
+.flow-connector {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  position: relative;
+}
+
+.flow-connector-line {
+  width: 24px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.3), rgba(99, 102, 241, 0.6));
+  border-radius: 1px;
+}
+
+.flow-connector-arrow {
+  font-size: 1.1rem;
+  color: var(--primary);
+  font-weight: 300;
+  animation: arrowPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes arrowPulse {
+  0%, 100% { opacity: 0.5; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(-3px); }
+}
+
+/* Flow animation - staggered entrance */
+.flow-animate-1 { animation: flowSlideIn 0.5s ease-out 0.1s both; }
+.flow-animate-2 { animation: flowFadeIn 0.4s ease-out 0.3s both; }
+.flow-animate-3 { animation: flowSlideIn 0.5s ease-out 0.5s both; }
+.flow-animate-4 { animation: flowSlideIn 0.5s ease-out 0.65s both; }
+.flow-animate-5 { animation: flowSlideIn 0.5s ease-out 0.8s both; }
+.flow-animate-6 { animation: flowFadeIn 0.4s ease-out 0.95s both; }
+.flow-animate-7 { animation: flowSlideIn 0.5s ease-out 1.1s both; }
+
+@keyframes flowSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes flowFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Mobile: vertical flow */
+@media (max-width: 640px) {
+  .flow-infographic {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 4px;
+  }
+
+  .flow-connector {
+    transform: rotate(90deg);
+  }
+
+  .flow-breakdown-col {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .flow-breakdown-col .flow-node {
+    min-width: 90px;
+    padding: 10px;
+  }
+
+  .flow-node {
+    min-width: 140px;
   }
 }
