@@ -154,6 +154,16 @@ export default function App() {
   function handleLogin(newToken: string) {
     sessionStorage.setItem('token', newToken)
     setToken(newToken)
+    // Clear previous session data — start fresh
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STEP_KEY)
+    setFormData(JSON.parse(JSON.stringify(DEFAULT_FORM)))
+    setCurrentStep('sale')
+    setFurthestStep(0)
+    setFilledFromContract(false)
+    setPreContractFormData(null)
+    setResult(null)
+    setError(null)
   }
 
   function handleLogout() {
