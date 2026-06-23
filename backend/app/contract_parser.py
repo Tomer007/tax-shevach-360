@@ -74,7 +74,11 @@ Rules:
 - IMPORTANT: Look for נסח רישום (land registry extract) data - it often shows:
   - "מהות פעולה: מכר" with a date = the original acquisition date
   - "שטר" numbers with dates = ownership transfer dates
+  - "תאריך" fields in ownership tables
   - Use the EARLIEST ownership date from the נסח as the acquisition_date
+  - If you see "מכר" + date in a table, that IS the acquisition date
+  - Even if the document says "הערה" (note) with a date, check if it's related to ownership transfer
+- If the contract header date and the נסח date are different, the נסח date is the ACQUISITION date
 - Identify all sellers/buyers and their ownership shares
 - Default share to 100% if only one seller
 - If currency is not specified, assume ILS

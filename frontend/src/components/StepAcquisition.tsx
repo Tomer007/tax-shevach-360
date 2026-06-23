@@ -57,7 +57,8 @@ export default function StepAcquisition({ formData, updateForm, onNext, onPrev, 
             ⚠️ פרטי הרכישה לא נמצאו בחוזה המכר
           </div>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
-            יש למלא את תאריך הרכישה וסכום הרכישה המקורי מהחוזה המקורי או מנסח הרישום.
+            יש למלא את <strong>תאריך הרכישה המקורי</strong> (מתי קניתם את הנכס) ו<strong>סכום הרכישה</strong> (כמה שילמתם).
+            ניתן למצוא בנסח הרישום (טאבו) או בחוזה הרכישה המקורי.
           </p>
         </div>
       )}
