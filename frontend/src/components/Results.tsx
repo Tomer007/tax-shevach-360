@@ -8,6 +8,25 @@ interface Props {
 
 function generateHtmlReport(result: CalculationResult): string {
   const bestRoute = result.route_comparison.reduce((a, b) => a.tax_amount < b.tax_amount ? a : b)
+  const worstRoute = result.route_comparison.reduce((a, b) => a.tax_amount > b.tax_amount ? a : b)
+  const totalSavings = worstRoute.tax_amount - bestRoute.tax_amount
+
+  // Calculate percentages for the infographic pie/donut
+  const saleAmount = result.seller_results.reduce((sum, s) => sum + s.sale_amount_ils, 0)
+  const totalCost = result.seller_results.reduce((sum, s) => sum + s.total_cost_indexed, 0)
+  const inflationary = result.full_inflationary
+  const realShevach = result.full_real_shevach
+  const tax = result.full_tax
+
+  // For the waterfall/flow chart
+  const costPercent = saleAmount > 0 ? (totalCost / saleAmount * 100) : 0
+  const inflationaryPercent = saleAmount > 0 ? (inflationary / saleAmount * 100) : 0
+  const realShevachPercent = saleAmount > 0 ? (realShevach / saleAmount * 100) : 0
+  const taxPercent = saleAmount > 0 ? (tax / saleAmount * 100) : 0
+  const netPercent = saleAmount > 0 ? ((saleAmount - totalCost - tax) / saleAmount * 100) : 0
+
+  // Route bar chart - normalize to max
+  const maxRouteTax = Math.max(...result.route_comparison.map(r => r.tax_amount), 1)
 
   const sellersHtml = result.seller_results.map((s) => `
     <div class="seller-section">
@@ -193,13 +212,77 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 .report-footer p{font-size:0.75rem;color:#52525b}
 .powered{font-size:0.7rem;color:#3f3f46;margin-top:8px}
 
+/* Infographics */
+.infographic-section{background:#1c1c2e;border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:24px;margin-bottom:24px}
+.infographic-title{font-size:1rem;font-weight:700;color:#e4e4e7;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+
+/* Flow Chart */
+.flow-chart{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:16px 0}
+.flow-item{text-align:center;padding:16px 12px;border-radius:12px;min-width:100px}
+.flow-sale{background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(139,92,246,0.08));border:1px solid rgba(99,102,241,0.2)}
+.flow-cost{background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.12);border-radius:8px;padding:10px 8px;margin-bottom:6px}
+.flow-inflation{background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:8px;padding:10px 8px;margin-bottom:6px}
+.flow-shevach{background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:8px;padding:10px 8px}
+.flow-tax{background:linear-gradient(135deg,rgba(52,211,153,0.1),rgba(16,185,129,0.08));border:1px solid rgba(52,211,153,0.2)}
+.flow-icon{font-size:1.5rem;margin-bottom:6px}
+.flow-label{font-size:0.7rem;color:#a1a1aa;font-weight:500;margin-bottom:4px}
+.flow-amount{font-size:0.9rem;font-weight:700;color:#f4f4f5;font-variant-numeric:tabular-nums}
+.flow-pct{font-size:0.68rem;color:#71717a;margin-top:2px}
+.flow-arrow{font-size:1.5rem;color:#52525b;font-weight:300}
+.flow-breakdown{display:flex;flex-direction:column;gap:4px}
+
+/* Stacked Bar */
+.stacked-bar-container{padding:8px 0}
+.stacked-bar{display:flex;height:40px;border-radius:8px;overflow:hidden;margin-bottom:14px}
+.stacked-seg{display:flex;align-items:center;justify-content:center;min-width:2px;transition:all 0.3s}
+.stacked-seg span{font-size:0.68rem;font-weight:700;color:#fff}
+.seg-cost{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+.seg-inflation{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.seg-net{background:linear-gradient(135deg,#10b981,#059669)}
+.seg-tax{background:linear-gradient(135deg,#ef4444,#dc2626)}
+.stacked-legend{display:flex;flex-wrap:wrap;gap:16px;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.75rem;color:#a1a1aa}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* Bar Chart */
+.bar-chart{display:flex;flex-direction:column;gap:12px;padding:8px 0}
+.bar-row{display:grid;grid-template-columns:120px 1fr 100px;align-items:center;gap:12px}
+.bar-row.bar-best .bar-label{color:#34d399;font-weight:700}
+.bar-label{font-size:0.8rem;color:#a1a1aa;font-weight:500;text-align:start}
+.bar-track{height:24px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:6px;transition:width 0.5s ease}
+.bar-fill-best{background:linear-gradient(90deg,#10b981,#34d399)}
+.bar-value{font-size:0.82rem;font-weight:700;color:#e4e4e7;text-align:left;font-variant-numeric:tabular-nums}
+
+/* Savings Callout */
+.savings-callout{display:flex;align-items:center;gap:16px;margin-top:20px;padding:18px 20px;background:linear-gradient(135deg,rgba(52,211,153,0.08),rgba(16,185,129,0.04));border:1px solid rgba(52,211,153,0.2);border-radius:12px}
+.savings-icon{font-size:2rem}
+.savings-content{flex:1}
+.savings-title{font-size:0.78rem;color:#a7f3d0;font-weight:500;margin-bottom:4px}
+.savings-amount{font-size:1.6rem;font-weight:800;color:#34d399;font-variant-numeric:tabular-nums;margin-bottom:4px}
+.savings-desc{font-size:0.72rem;color:#71717a}
+
+/* Gauge */
+.gauge-container{text-align:center;padding:12px 0}
+.gauge{position:relative;height:20px;background:linear-gradient(90deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);border-radius:10px;margin-bottom:8px;opacity:0.3}
+.gauge-fill{position:absolute;inset:0;height:100%;background:linear-gradient(90deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);border-radius:10px;opacity:1}
+.gauge-marker{position:absolute;top:-8px;transform:translateX(50%);display:flex;flex-direction:column;align-items:center}
+.gauge-marker span{background:#1c1c2e;border:2px solid #34d399;border-radius:6px;padding:3px 10px;font-size:0.78rem;font-weight:700;color:#34d399;white-space:nowrap}
+.gauge-labels{display:flex;justify-content:space-between;font-size:0.68rem;color:#52525b;margin-bottom:12px}
+.gauge-explanation{font-size:0.75rem;color:#71717a;margin-top:8px}
+
 /* Print */
 @media print{
   body{background:#fff;color:#111}
   .report-header{background:#f8f9fc;border:1px solid #e4e4e7}
   .report-header h1{color:#4f46e5;-webkit-text-fill-color:#4f46e5}
-  .summary-card,.seller-section,.route-card{background:#fff;border:1px solid #e4e4e7}
-  .sc-value,.data-val,.route-tax{color:#111}
+  .summary-card,.seller-section,.route-card,.infographic-section{background:#fff;border:1px solid #e4e4e7}
+  .sc-value,.data-val,.route-tax,.bar-value,.flow-amount{color:#111}
+  .infographic-title{color:#111}
+  .stacked-bar{opacity:1}
+  .gauge{opacity:1}
+  .savings-callout{background:#f0fdf4;border-color:#86efac}
+  .savings-amount{color:#059669}
 }
 
 @media(max-width:640px){
@@ -208,6 +291,12 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
   .report{padding:20px 12px}
   .report-header{padding:32px 16px}
   .report-header h1{font-size:1.6rem}
+  .flow-chart{flex-direction:column;gap:8px}
+  .flow-arrow{transform:rotate(90deg)}
+  .flow-breakdown{flex-direction:row;gap:6px;flex-wrap:wrap;justify-content:center}
+  .bar-row{grid-template-columns:80px 1fr 70px;gap:8px}
+  .bar-label{font-size:0.7rem}
+  .savings-callout{flex-direction:column;text-align:center}
 }
 </style>
 </head>
@@ -239,8 +328,121 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
     </div>
   </div>
 
+  <!-- INFOGRAPHIC: Transaction Flow -->
+  <div class="infographic-section">
+    <h2 class="infographic-title">📊 תמונת העסקה במבט אחד</h2>
+    
+    <!-- Flow: Sale → Components -->
+    <div class="flow-chart">
+      <div class="flow-item flow-sale">
+        <div class="flow-icon">🏠</div>
+        <div class="flow-label">סכום מכירה</div>
+        <div class="flow-amount">${formatILS(saleAmount)}</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-breakdown">
+        <div class="flow-item flow-cost">
+          <div class="flow-label">עלות מתואמת</div>
+          <div class="flow-amount">${formatILS(totalCost)}</div>
+          <div class="flow-pct">${costPercent.toFixed(0)}%</div>
+        </div>
+        <div class="flow-item flow-inflation">
+          <div class="flow-label">סכום אינפלציוני</div>
+          <div class="flow-amount">${formatILS(inflationary)}</div>
+          <div class="flow-pct">${inflationaryPercent.toFixed(0)}%</div>
+        </div>
+        <div class="flow-item flow-shevach">
+          <div class="flow-label">שבח ריאלי</div>
+          <div class="flow-amount">${formatILS(realShevach)}</div>
+          <div class="flow-pct">${realShevachPercent.toFixed(0)}%</div>
+        </div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item flow-tax">
+        <div class="flow-icon">💰</div>
+        <div class="flow-label">מס לתשלום</div>
+        <div class="flow-amount">${formatILS(tax)}</div>
+        <div class="flow-pct">${taxPercent.toFixed(1)}% מהמכירה</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFOGRAPHIC: Stacked Bar - Where does the money go? -->
+  <div class="infographic-section">
+    <h2 class="infographic-title">💸 לאן הולך הכסף?</h2>
+    <div class="stacked-bar-container">
+      <div class="stacked-bar">
+        <div class="stacked-seg seg-cost" style="width:${costPercent}%" title="עלות מתואמת">
+          ${costPercent > 8 ? `<span>${costPercent.toFixed(0)}%</span>` : ''}
+        </div>
+        <div class="stacked-seg seg-inflation" style="width:${inflationaryPercent}%" title="אינפלציה">
+          ${inflationaryPercent > 8 ? `<span>${inflationaryPercent.toFixed(0)}%</span>` : ''}
+        </div>
+        <div class="stacked-seg seg-net" style="width:${netPercent > 0 ? netPercent : 0}%" title="רווח נקי">
+          ${netPercent > 8 ? `<span>${netPercent.toFixed(0)}%</span>` : ''}
+        </div>
+        <div class="stacked-seg seg-tax" style="width:${taxPercent}%" title="מס">
+          ${taxPercent > 5 ? `<span>${taxPercent.toFixed(0)}%</span>` : ''}
+        </div>
+      </div>
+      <div class="stacked-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>עלות מתואמת</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>אינפלציה</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#10b981"></span>רווח נקי (אחרי מס)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>מס</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFOGRAPHIC: Route Comparison Bar Chart -->
+  <div class="infographic-section">
+    <h2 class="infographic-title">⚖️ השוואת מסלולי מיסוי</h2>
+    <div class="bar-chart">
+      ${result.route_comparison.map(r => {
+        const barWidth = (r.tax_amount / maxRouteTax) * 100
+        const isBest = r.tax_amount === bestRoute.tax_amount
+        return `
+        <div class="bar-row ${isBest ? 'bar-best' : ''}">
+          <div class="bar-label">${routeNameHebrew(r.route_name)}${isBest ? ' ✓' : ''}</div>
+          <div class="bar-track">
+            <div class="bar-fill ${isBest ? 'bar-fill-best' : ''}" style="width:${barWidth}%"></div>
+          </div>
+          <div class="bar-value">${formatILS(r.tax_amount)}</div>
+        </div>`
+      }).join('')}
+    </div>
+    ${totalSavings > 0 ? `
+    <div class="savings-callout">
+      <div class="savings-icon">🎯</div>
+      <div class="savings-content">
+        <div class="savings-title">חיסכון במסלול המומלץ</div>
+        <div class="savings-amount">${formatILS(totalSavings)}</div>
+        <div class="savings-desc">הפרש בין מסלול ${routeNameHebrew(bestRoute.route_name)} לבין מסלול ${routeNameHebrew(worstRoute.route_name)}</div>
+      </div>
+    </div>` : ''}
+  </div>
+
+  <!-- INFOGRAPHIC: Effective Tax Rate Gauge -->
+  <div class="infographic-section">
+    <h2 class="infographic-title">📈 שיעור מס אפקטיבי</h2>
+    <div class="gauge-container">
+      <div class="gauge">
+        <div class="gauge-fill" style="width:${Math.min(bestRoute.effective_rate * 2, 100)}%"></div>
+        <div class="gauge-marker" style="right:${Math.min(bestRoute.effective_rate * 2, 100)}%">
+          <span>${formatPercent(bestRoute.effective_rate)}</span>
+        </div>
+      </div>
+      <div class="gauge-labels">
+        <span>0%</span>
+        <span>25%</span>
+        <span>50%</span>
+      </div>
+      <p class="gauge-explanation">שיעור המס האפקטיבי מהשבח הריאלי — ככל שנמוך יותר, כך המסלול משתלם יותר</p>
+    </div>
+  </div>
+
   <div class="routes-section">
-    <h2>השוואת מסלולים</h2>
+    <h2>השוואת מסלולים — פירוט</h2>
     ${routesHtml}
   </div>
 

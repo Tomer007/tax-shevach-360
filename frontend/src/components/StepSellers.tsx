@@ -6,6 +6,7 @@ interface Props {
   updateForm: (partial: Partial<TransactionInput>) => void
   onNext: () => void
   onPrev: () => void
+  highlightMissing?: boolean
 }
 
 const emptySeller: Seller = {
@@ -19,7 +20,7 @@ const emptySeller: Seller = {
   prisa_max_years: [],
 }
 
-export default function StepSellers({ formData, updateForm, onNext, onPrev }: Props) {
+export default function StepSellers({ formData, updateForm, onNext, onPrev, highlightMissing }: Props) {
   const sellers = formData.sellers ?? []
   const [editIdx, setEditIdx] = useState<number | null>(sellers.length === 0 ? 0 : null)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
@@ -115,9 +116,13 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
                   onBlur={() => markTouched(`name-${idx}`)}
                   style={{ direction: 'rtl', textAlign: 'right' }}
                   aria-invalid={!!errors.name}
-                  className={errors.name ? 'input-error' : ''}
+                  className={`${errors.name ? 'input-error' : ''} ${highlightMissing && !seller.name ? 'highlight-missing' : ''}`}
                 />
-                {errors.name && <span className="error-msg" role="alert">{errors.name}</span>}
+                {errors.name ? (
+                  <span className="error-msg" role="alert">{errors.name}</span>
+                ) : highlightMissing && !seller.name ? (
+                  <span className="missing-field-hint">⚠ לא נמצא בחוזה — יש למלא ידנית</span>
+                ) : null}
               </div>
               <div className="form-group">
                 <label>ת.ז.</label>
@@ -134,7 +139,11 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
                   type="date"
                   value={seller.birth_date}
                   onChange={(e) => updateSeller(idx, { birth_date: e.target.value })}
+                  className={highlightMissing && !seller.birth_date ? 'highlight-missing' : ''}
                 />
+                {highlightMissing && !seller.birth_date && (
+                  <span className="missing-field-hint">⚠ חשוב לפריסה — יש למלא</span>
+                )}
               </div>
               <div className="form-group">
                 <label>חלק בנכס (%)</label>

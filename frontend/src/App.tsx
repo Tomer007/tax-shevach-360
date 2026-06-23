@@ -371,10 +371,10 @@ export default function App() {
         onTouchEnd={handleTouchEnd}
       >
         {currentStep === 'sale' && (
-          <StepSale formData={formData} updateForm={updateForm} onNext={goNext} />
+          <StepSale formData={formData} updateForm={updateForm} onNext={goNext} highlightMissing={filledFromContract} />
         )}
         {currentStep === 'sellers' && (
-          <StepSellers formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
+          <StepSellers formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} highlightMissing={filledFromContract} />
         )}
         {currentStep === 'acquisition' && (
           <StepAcquisition formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} filledFromContract={filledFromContract} />

@@ -5,9 +5,10 @@ interface Props {
   formData: Partial<TransactionInput>
   updateForm: (partial: Partial<TransactionInput>) => void
   onNext: () => void
+  highlightMissing?: boolean
 }
 
-export default function StepSale({ formData, updateForm, onNext }: Props) {
+export default function StepSale({ formData, updateForm, onNext, highlightMissing }: Props) {
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const canContinue = formData.sale_date && formData.sale_amount && formData.sale_amount > 0
 
@@ -19,6 +20,12 @@ export default function StepSale({ formData, updateForm, onNext }: Props) {
   const errors: Record<string, string> = {}
   if (touched.sale_date && !formData.sale_date) errors.sale_date = 'שדה חובה'
   if (touched.sale_amount && (!formData.sale_amount || formData.sale_amount <= 0)) errors.sale_amount = 'יש להזין סכום חיובי'
+
+  // Highlight missing fields when contract didn't fill them
+  const missing = {
+    sale_date: highlightMissing && !formData.sale_date,
+    sale_amount: highlightMissing && (!formData.sale_amount || formData.sale_amount <= 0),
+  }
 
   return (
     <div className="card">
@@ -37,10 +44,12 @@ export default function StepSale({ formData, updateForm, onNext }: Props) {
             required
             aria-required="true"
             aria-invalid={!!errors.sale_date}
-            className={errors.sale_date ? 'input-error' : ''}
+            className={`${errors.sale_date ? 'input-error' : ''} ${missing.sale_date ? 'highlight-missing' : ''}`}
           />
           {errors.sale_date ? (
             <span className="error-msg" role="alert">{errors.sale_date}</span>
+          ) : missing.sale_date ? (
+            <span className="missing-field-hint">⚠ לא נמצא בחוזה — יש למלא ידנית</span>
           ) : (
             <span className="helper-text">תאריך חתימת החוזה</span>
           )}
@@ -60,12 +69,14 @@ export default function StepSale({ formData, updateForm, onNext }: Props) {
             required
             aria-required="true"
             aria-invalid={!!errors.sale_amount}
-            className={errors.sale_amount ? 'input-error' : ''}
+            className={`${errors.sale_amount ? 'input-error' : ''} ${missing.sale_amount ? 'highlight-missing' : ''}`}
             inputMode="numeric"
           />
-          {errors.sale_amount && (
+          {errors.sale_amount ? (
             <span className="error-msg" role="alert">{errors.sale_amount}</span>
-          )}
+          ) : missing.sale_amount ? (
+            <span className="missing-field-hint">⚠ לא נמצא בחוזה — יש למלא ידנית</span>
+          ) : null}
         </div>
         <div className="form-group">
           <label htmlFor="sale_currency">מטבע</label>
