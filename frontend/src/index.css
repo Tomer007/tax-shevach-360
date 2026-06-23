@@ -2111,9 +2111,16 @@ body {
   animation: arrowPulse 1.5s ease-in-out infinite;
 }
 
+.flow-arrow-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
 @keyframes arrowPulse {
   0%, 100% { opacity: 0.6; transform: translateX(0); }
-  50% { opacity: 1; transform: translateX(-4px); }
+  50% { opacity: 1; transform: translateX(4px); }
 }
 
 /* Flow animation - staggered entrance */
@@ -2147,6 +2154,10 @@ body {
     flex-direction: column;
     gap: 12px;
     padding: 16px 4px;
+  }
+
+  .flow-arrow-connector {
+    transform: rotate(90deg);
   }
 
   .flow-connector {

@@ -530,14 +530,15 @@ export default function Results({ result, onReset }: Props) {
         <h2 className="card-title">תמונת העסקה במבט אחד</h2>
         <div className="flow-infographic">
           <div className="flow-node flow-node-sale flow-animate-1">
-            
             <div className="flow-node-label">סכום מכירה</div>
             <div className="flow-node-amount">{formatILS(saleAmount)}</div>
           </div>
 
-          <div className="flow-connector flow-animate-2">
-            <div className="flow-connector-line" />
-            <div className="flow-connector-arrow">→</div>
+          <div className="flow-arrow-connector flow-animate-2">
+            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
+              <line x1="44" y1="12" x2="8" y2="12" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round"/>
+              <polyline points="14,6 6,12 14,18" stroke="var(--primary)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
 
           <div className="flow-breakdown-col">
@@ -558,13 +559,14 @@ export default function Results({ result, onReset }: Props) {
             </div>
           </div>
 
-          <div className="flow-connector flow-animate-6">
-            <div className="flow-connector-line" />
-            <div className="flow-connector-arrow">→</div>
+          <div className="flow-arrow-connector flow-animate-6">
+            <svg width="48" height="24" viewBox="0 0 48 24" fill="none">
+              <line x1="44" y1="12" x2="8" y2="12" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round"/>
+              <polyline points="14,6 6,12 14,18" stroke="var(--success)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
 
           <div className="flow-node flow-node-tax flow-animate-7">
-            
             <div className="flow-node-label">מס לתשלום</div>
             <div className="flow-node-amount flow-node-amount-tax">{formatILS(taxAmount)}</div>
             <div className="flow-node-pct">{taxPct.toFixed(1)}% מהמכירה</div>
