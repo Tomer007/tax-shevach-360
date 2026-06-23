@@ -60,9 +60,12 @@ class TestUploadContract:
         _parse_cache.clear()
 
     @patch("app.auth_routes.parse_contract_text")
+    @patch("app.auth_routes.parse_contract_regex")
     @patch("app.auth_routes.send_contract_result_email", return_value=True)
-    def test_text_pdf_uses_text_parser(self, mock_email, mock_parse):
-        """PDF with good text uses text parser."""
+    def test_text_pdf_uses_text_parser(self, mock_email, mock_regex, mock_parse):
+        """PDF with good text tries regex first, falls back to AI."""
+        # Regex returns low confidence → falls back to AI
+        mock_regex.return_value = ParsedContract(confidence="failed")
         mock_parse.return_value = ParsedContract(
             sale_date="2025-01-01",
             sale_amount=2_000_000,

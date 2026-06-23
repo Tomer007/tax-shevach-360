@@ -22,7 +22,6 @@ from app.auth import (
 )
 from app.contract_parser import ParsedContract, parse_contract_text, parse_contract_images
 from app.email_service import send_contract_result_email
-from app.local_parser import parse_contract_text_local, parse_contract_images_local, is_ollama_available
 from app.regex_parser import parse_contract_regex
 from app.models import TransactionInput
 
@@ -97,33 +96,16 @@ def get_me(current_user: dict = Depends(get_current_user)):
     }
 
 
-@router.get("/parser-options")
-def get_parser_options():
-    """Get available parser options (AI vs local vs smart)."""
-    ollama_available = is_ollama_available()
-    return {
-        "options": [
-            {"id": "ai", "label": "AI (OpenAI)", "available": True, "description": "GPT-4o — דיוק גבוה, דורש חיבור לאינטרנט"},
-            {"id": "smart", "label": "ניתוח חכם (מקומי)", "available": True, "description": "חילוץ מבוסס חוקים — מהיר, ללא עלות, עובד אופליין"},
-            {"id": "local", "label": "Ollama (LLM מקומי)", "available": ollama_available, "description": "Llama — ללא עלות, דורש התקנת Ollama"},
-        ],
-        "default": "ai",
-    }
-
-
 @router.post("/upload-contract", response_model=ParsedContract)
 async def upload_contract(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    parser: str = "ai",  # "ai" (OpenAI) or "local" (Ollama) or "smart" (regex)
 ):
-    """Upload a contract document and extract transaction details using AI.
+    """Upload a contract document and extract transaction details.
 
-    Accepts PDF or text files. Requires authentication.
-    Query param `parser`: "ai" for OpenAI (default), "local" for Ollama, "smart" for regex.
+    Strategy: Try regex parser first (fast, free). If it fails, fall back to OpenAI.
+    For scanned PDFs with no text layer, go directly to OpenAI Vision.
     """
-    use_local = parser.lower() == "local"
-    use_smart = parser.lower() == "smart"
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
@@ -167,36 +149,13 @@ async def upload_contract(
         has_key_terms = any(term in text for term in ['תמורה', 'מכר', 'מוכר', 'קונה', 'חוזה', 'ש"ח', 'שקל'])
         text_quality_ok = hebrew_chars > 100 and has_key_terms
 
-        # If no text extracted OR text quality is poor, use OpenAI Vision
+        # If no text extracted OR text quality is poor, use OpenAI Vision directly
         if not text.strip() or not text_quality_ok:
-            if use_smart:
-                # Smart parser: try anyway with whatever text we have
-                if text.strip():
-                    logger.info(f"Smart parser attempting with low-quality text: {file.filename}")
-                    result = parse_contract_regex(text)
-                    if result.confidence == "failed" or (not result.sale_date and not result.sale_amount):
-                        # Smart parser couldn't extract anything useful — return clear message
-                        return ParsedContract(
-                            confidence="failed",
-                            notes="הניתוח החכם לא הצליח לחלץ נתונים מה-PDF. הקובץ נראה כסרוק — נסה את מצב AI.",
-                        )
-                    # Cache and return
-                    if len(_parse_cache) >= MAX_CACHE_SIZE:
-                        _parse_cache.pop(next(iter(_parse_cache)))
-                    _parse_cache[file_hash] = result
-                    return result
-                else:
-                    return ParsedContract(
-                        confidence="failed",
-                        notes="לא ניתן לחלץ טקסט מה-PDF. הקובץ נראה כסרוק — נסה את מצב AI.",
-                    )
             logger.info(f"{'No text layer' if not text.strip() else 'Poor text quality'} in PDF, using Vision for {file.filename}")
             try:
-
-
                 doc = fitz.open(stream=content, filetype="pdf")
                 images_b64: list[str] = []
-                for page_num in range(min(len(doc), 8)):  # First 8 pages
+                for page_num in range(min(len(doc), 8)):
                     page = doc[page_num]
                     pix = page.get_pixmap(dpi=150)
                     img_bytes = pix.tobytes("png")
@@ -204,12 +163,7 @@ async def upload_contract(
                 doc.close()
 
                 if images_b64:
-                    if use_local:
-                        result = parse_contract_images_local(images_b64)
-                    else:
-                        result = parse_contract_images(images_b64)
-                    # Log extracted fields as pretty JSON for debugging
-
+                    result = parse_contract_images(images_b64)
                     logger.warning(
                         f"\n{'='*60}\n"
                         f"PARSED CONTRACT (Vision) [{file.filename}]\n"
@@ -217,12 +171,10 @@ async def upload_contract(
                         f"{json.dumps(result.model_dump(), ensure_ascii=False, indent=2, default=str)}\n"
                         f"{'='*60}"
                     )
-                    # Send email notification with attachment
                     user_email = current_user.get("email")
                     email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
                     if not email_sent:
                         logger.warning(f"Failed to send email for {file.filename}")
-                    # Cache result
                     if len(_parse_cache) >= MAX_CACHE_SIZE:
                         _parse_cache.pop(next(iter(_parse_cache)))
                     _parse_cache[file_hash] = result
@@ -248,11 +200,10 @@ async def upload_contract(
     text_for_parsing = text[:30_000]
 
     try:
-        if use_smart:
-            result = parse_contract_regex(text_for_parsing)
-        elif use_local:
-            result = parse_contract_text_local(text_for_parsing)
-        else:
+        # Strategy: try regex first (fast, free), fall back to AI if it fails
+        result = parse_contract_regex(text_for_parsing)
+        if result.confidence == "failed" or (not result.sale_date and not result.sale_amount):
+            logger.info(f"Regex parser insufficient for {file.filename}, falling back to AI")
             result = parse_contract_text(text_for_parsing)
     except ValueError as e:
         raise HTTPException(status_code=503, detail=str(e))
@@ -276,10 +227,7 @@ async def upload_contract(
             doc.close()
 
             if images_b64:
-                if use_local:
-                    vision_result = parse_contract_images_local(images_b64)
-                else:
-                    vision_result = parse_contract_images(images_b64)
+                vision_result = parse_contract_images(images_b64)
                 # Use vision result only if it's better (has sale_amount)
                 if vision_result.sale_amount:
                     result = vision_result

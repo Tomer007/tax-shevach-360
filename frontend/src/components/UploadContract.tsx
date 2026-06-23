@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import axios from 'axios'
 import type { TransactionInput } from '../types'
-import CodeNameModal from './CodeNameModal'
 
 interface Props {
   token: string
@@ -31,29 +30,16 @@ interface MissingField {
 }
 
 export default function UploadContract({ token, onDataExtracted, onPendingChange }: Props) {
-  const [showCodeModal, setShowCodeModal] = useState(false)
-  const [codeVerified, setCodeVerified] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [approved, setApproved] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
-  const [parserMode, setParserMode] = useState<'ai' | 'local' | 'smart'>('ai')
   const [uploadedFileName, setUploadedFileName] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
-    if (!codeVerified) {
-      setShowCodeModal(true)
-      return
-    }
     fileRef.current?.click()
-  }
-
-  function handleCodeVerified() {
-    setCodeVerified(true)
-    setShowCodeModal(false)
-    setTimeout(() => fileRef.current?.click(), 100)
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -71,7 +57,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
     formData.append('file', file)
 
     try {
-      const { data } = await axios.post(`/api/upload-contract?parser=${parserMode}`, formData, {
+      const { data } = await axios.post('/api/upload-contract', formData, {
         headers: { Authorization: `Bearer ${token}` },
       })
 
@@ -253,16 +239,6 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
             '📄 העלה חוזה'
           )}
         </button>
-        <select
-          className="parser-select"
-          value={parserMode}
-          onChange={(e) => setParserMode(e.target.value as 'ai' | 'local' | 'smart')}
-          title="בחר מנוע ניתוח"
-        >
-          <option value="ai">🌐 AI (OpenAI)</option>
-          <option value="smart">⚡ ניתוח חכם</option>
-          <option value="local">💻 Ollama</option>
-        </select>
         <input
           ref={fileRef}
           type="file"
@@ -612,13 +588,6 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
             </>
           )}
         </div>
-      )}
-
-      {showCodeModal && (
-        <CodeNameModal
-          onVerified={handleCodeVerified}
-          onClose={() => setShowCodeModal(false)}
-        />
       )}
     </>
   )
