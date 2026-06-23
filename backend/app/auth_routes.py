@@ -143,6 +143,13 @@ async def upload_contract(
 
                 if images_b64:
                     result = parse_contract_images(images_b64)
+                    # Post-processing: if acquisitions empty, try regex on whatever text we have
+                    if not result.acquisitions and text.strip():
+
+                        regex_result = parse_contract_regex(text)
+                        if regex_result.acquisitions:
+                            result.acquisitions = regex_result.acquisitions
+                            logger.info(f"Filled acquisitions from regex (Vision path): {regex_result.acquisitions}")
                     logger.debug(f"PARSED CONTRACT (Vision) [{file.filename}]: {json.dumps(result.model_dump(), ensure_ascii=False, default=str)}")
                     user_email = current_user.get("email")
                     email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
@@ -206,7 +213,13 @@ async def upload_contract(
             logger.warning(f"Vision retry failed for {file.filename}: {e}")
             # Keep original text-based result
 
-    # Log extracted fields as pretty JSON for debugging
+    # Post-processing: if acquisitions is empty but we have text, try regex to find נסח dates
+    if not result.acquisitions and text.strip():
+
+        regex_result = parse_contract_regex(text[:30_000])
+        if regex_result.acquisitions:
+            result.acquisitions = regex_result.acquisitions
+            logger.info(f"Filled acquisitions from regex: {regex_result.acquisitions}")
 
     logger.debug(f"PARSED CONTRACT [{file.filename}]: {json.dumps(result.model_dump(), ensure_ascii=False, default=str)}")
 
