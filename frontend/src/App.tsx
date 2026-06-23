@@ -295,11 +295,14 @@ export default function App() {
   if (result) {
     return (
       <div className="app">
-        <header className="app-header">
+        <header className="app-header" style={{ position: 'relative' }}>
           <h1 onClick={handleTitleClick} style={{ cursor: 'pointer', userSelect: 'none' }}>
             מס שבח 360
           </h1>
           <p>תוצאות החישוב</p>
+          <button className="btn btn-secondary btn-sm" onClick={handleLogout} type="button" style={{ position: 'absolute', top: 12, left: 12, zIndex: 1 }}>
+            התנתק
+          </button>
         </header>
         <div className="success-banner" role="status" aria-live="polite">
           החישוב הושלם בהצלחה
