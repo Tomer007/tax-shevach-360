@@ -22,6 +22,12 @@ const emptySeller: Seller = {
 export default function StepSellers({ formData, updateForm, onNext, onPrev }: Props) {
   const sellers = formData.sellers ?? []
   const [editIdx, setEditIdx] = useState<number | null>(sellers.length === 0 ? 0 : null)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [showIncomePanel, setShowIncomePanel] = useState<number | null>(null)
+
+  function markTouched(field: string) {
+    setTouched(prev => ({ ...prev, [field]: true }))
+  }
 
   function addSeller() {
     const remaining = 100 - sellers.reduce((s, sel) => s + sel.share_percent, 0)
@@ -40,8 +46,27 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
     setEditIdx(null)
   }
 
+  // Feature 5: Update annual income for a seller
+  function updateSellerIncome(sellerIdx: number, year: number, amount: number) {
+    const seller = sellers[sellerIdx]
+    if (!seller) return
+    const incomes = { ...seller.annual_incomes, [year]: amount }
+    updateSeller(sellerIdx, { annual_incomes: incomes })
+  }
+
   // Only require name to proceed (birth_date optional for companies)
   const canContinue = sellers.length > 0 && sellers.every((s) => s.name)
+
+  // Feature 3: Validation
+  const getSellerErrors = (seller: Seller, idx: number) => {
+    const errors: Record<string, string> = {}
+    if (touched[`name-${idx}`] && !seller.name) errors.name = 'שדה חובה'
+    if (touched[`share-${idx}`] && (seller.share_percent <= 0 || seller.share_percent > 100)) errors.share = 'חלק חייב להיות בין 1-100%'
+    return errors
+  }
+
+  // Determine the sale year for income guidance
+  const saleYear = formData.sale_date ? new Date(formData.sale_date).getFullYear() : new Date().getFullYear()
 
   // If no sellers yet, start with one
   if (sellers.length === 0) {
@@ -53,7 +78,9 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
     <div className="card">
       <h3 className="card-title">מוכרים</h3>
 
-      {sellers.map((seller, idx) => (
+      {sellers.map((seller, idx) => {
+        const errors = getSellerErrors(seller, idx)
+        return (
         <div key={idx} className="seller-card">
           <div className="seller-header">
             <h4>מוכר {idx + 1}: {seller.name || '(חדש)'}</h4>
@@ -77,15 +104,20 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
           </div>
 
           {editIdx === idx && (
+            <>
             <div className="form-grid">
               <div className="form-group">
-                <label>שם מלא</label>
+                <label>שם מלא <span className="required">*</span></label>
                 <input
                   type="text"
                   value={seller.name}
                   onChange={(e) => updateSeller(idx, { name: e.target.value })}
+                  onBlur={() => markTouched(`name-${idx}`)}
                   style={{ direction: 'rtl', textAlign: 'right' }}
+                  aria-invalid={!!errors.name}
+                  className={errors.name ? 'input-error' : ''}
                 />
+                {errors.name && <span className="error-msg" role="alert">{errors.name}</span>}
               </div>
               <div className="form-group">
                 <label>ת.ז.</label>
@@ -112,7 +144,11 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
                   max={100}
                   value={seller.share_percent}
                   onChange={(e) => updateSeller(idx, { share_percent: Number(e.target.value) })}
+                  onBlur={() => markTouched(`share-${idx}`)}
+                  aria-invalid={!!errors.share}
+                  className={errors.share ? 'input-error' : ''}
                 />
+                {errors.share && <span className="error-msg" role="alert">{errors.share}</span>}
               </div>
               <div className="form-group">
                 <label>מצב משפחתי</label>
@@ -138,9 +174,45 @@ export default function StepSellers({ formData, updateForm, onNext, onPrev }: Pr
                 </div>
               </div>
             </div>
+
+            {/* Feature 5: Annual Income Section - prominently displayed */}
+            <div className="income-section">
+              <div className="income-header" onClick={() => setShowIncomePanel(showIncomePanel === idx ? null : idx)}>
+                <span className="income-title">
+                  💰 הכנסות שנתיות (חשוב לפריסה ומס יסף)
+                </span>
+                <span className="income-toggle">{showIncomePanel === idx ? '▲' : '▼'}</span>
+              </div>
+              {showIncomePanel === idx && (
+                <div className="income-panel">
+                  <p className="income-description">
+                    הכנסות שנתיות משפיעות על חישוב <strong>מס יסף</strong> (3% מעל ₪721,560) ועל <strong>פריסה</strong> (חלוקת השבח על פני שנים).
+                    ככל שההכנסה נמוכה יותר — המס נמוך יותר.
+                  </p>
+                  <div className="income-grid">
+                    {[saleYear - 3, saleYear - 2, saleYear - 1, saleYear].map(year => (
+                      <div key={year} className="income-year">
+                        <label htmlFor={`income-${idx}-${year}`}>{year}</label>
+                        <input
+                          id={`income-${idx}-${year}`}
+                          type="number"
+                          min={0}
+                          value={seller.annual_incomes[year] || ''}
+                          onChange={(e) => updateSellerIncome(idx, year, Number(e.target.value))}
+                          placeholder="₪ הכנסה שנתית"
+                          inputMode="numeric"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            </>
           )}
         </div>
-      ))}
+        )
+      })}
 
       <button className="btn btn-secondary btn-sm" onClick={addSeller} type="button">
         + הוסף מוכר

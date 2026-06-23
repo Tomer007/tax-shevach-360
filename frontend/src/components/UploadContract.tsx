@@ -36,16 +36,14 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
   const [approved, setApproved] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [uploadedFileName, setUploadedFileName] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleUploadClick() {
     fileRef.current?.click()
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  async function processFile(file: File) {
     setUploading(true)
     setError('')
     setExtractedData(null)
@@ -62,11 +60,8 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
       })
 
       setExtractedData(data)
-
-      // Signal that we have pending data (form should be hidden)
       onPendingChange(true)
 
-      // Auto-approve if confidence is high and critical fields are present
       if (data.confidence === 'high' && data.sale_amount && data.sale_date) {
         autoApprove(data)
       }
@@ -80,6 +75,43 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await processFile(file)
+  }
+
+  // Feature 2: Drag & Drop handlers
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+
+    const allowedTypes = ['.txt', '.pdf', '.doc', '.docx']
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!allowedTypes.includes(ext)) {
+      setError('סוג קובץ לא נתמך. השתמש ב-PDF, DOC, DOCX או TXT')
+      return
+    }
+
+    await processFile(file)
   }
 
   function getMissingFields(): MissingField[] {
@@ -219,22 +251,30 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
 
   return (
     <>
-      <div className="upload-section">
-        <button
-          className="btn btn-secondary"
-          onClick={handleUploadClick}
-          disabled={uploading}
-          type="button"
-        >
-          {uploading ? (
-            <>
-              <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden="true" />
-              קורא חוזה...
-            </>
-          ) : (
-            '📄 העלה חוזה'
-          )}
-        </button>
+      <div
+        className={`upload-section upload-dropzone ${isDragOver ? 'drag-over' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div className="upload-dropzone-content">
+          <button
+            className="btn btn-secondary"
+            onClick={handleUploadClick}
+            disabled={uploading}
+            type="button"
+          >
+            {uploading ? (
+              <>
+                <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} aria-hidden="true" />
+                קורא חוזה...
+              </>
+            ) : (
+              '📄 העלה חוזה'
+            )}
+          </button>
+          <span className="upload-hint">או גרור קובץ לכאן (PDF, DOC, TXT)</span>
+        </div>
         <input
           ref={fileRef}
           type="file"

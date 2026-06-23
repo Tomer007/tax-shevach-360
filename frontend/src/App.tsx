@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { calculateTax } from './api'
 import type { CalculationResult, TransactionInput } from './types'
 import { MOCK_TRANSACTION } from './mockData'
+import { formatILS } from './utils'
 import LoginPage from './components/LoginPage'
 import UploadContract from './components/UploadContract'
 import StepSale from './components/StepSale'
@@ -9,6 +10,7 @@ import StepSellers from './components/StepSellers'
 import StepAcquisition from './components/StepAcquisition'
 import StepDeductions from './components/StepDeductions'
 import StepExemptions from './components/StepExemptions'
+import Onboarding from './components/Onboarding'
 import Results from './components/Results'
 
 const STEPS = [
@@ -21,34 +23,72 @@ const STEPS = [
 
 type StepKey = (typeof STEPS)[number]['key']
 
+const STORAGE_KEY = 'mas-shevach-360-form'
+const STEP_KEY = 'mas-shevach-360-step'
+const ONBOARDING_KEY = 'mas-shevach-360-onboarding-done'
+
+const DEFAULT_FORM: Partial<TransactionInput> = {
+  sale_currency: 'ILS',
+  sellers: [],
+  acquisitions: [],
+  deductions: [],
+  depreciation: { mode: 'manual', manual_amount: 0, rental_periods: [], land_ratio: 1 / 3 },
+  exemption: {
+    is_single_apartment: false,
+    ownership_months: 0,
+    is_inheritance: false,
+    has_building_rights: false,
+    building_rights_value: 0,
+    apartment_value_without_rights: 0,
+  },
+  prisa_years: 0,
+  is_residential: true,
+  betterment_levy: 0,
+}
+
+function loadSavedForm(): Partial<TransactionInput> {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) return JSON.parse(saved)
+  } catch { /* ignore corrupt data */ }
+  return JSON.parse(JSON.stringify(DEFAULT_FORM))
+}
+
+function loadSavedStep(): StepKey {
+  try {
+    const saved = localStorage.getItem(STEP_KEY)
+    if (saved && STEPS.some(s => s.key === saved)) return saved as StepKey
+  } catch { /* ignore */ }
+  return 'sale'
+}
+
 export default function App() {
   const [token, setToken] = useState<string | null>(
     () => sessionStorage.getItem('token')
   )
-  const [currentStep, setCurrentStep] = useState<StepKey>('sale')
-  const [formData, setFormData] = useState<Partial<TransactionInput>>({
-    sale_currency: 'ILS',
-    sellers: [],
-    acquisitions: [],
-    deductions: [],
-    depreciation: { mode: 'manual', manual_amount: 0, rental_periods: [], land_ratio: 1 / 3 },
-    exemption: {
-      is_single_apartment: false,
-      ownership_months: 0,
-      is_inheritance: false,
-      has_building_rights: false,
-      building_rights_value: 0,
-      apartment_value_without_rights: 0,
-    },
-    prisa_years: 0,
-    is_residential: true,
-    betterment_levy: 0,
-  })
+  const [currentStep, setCurrentStep] = useState<StepKey>(loadSavedStep)
+  const [formData, setFormData] = useState<Partial<TransactionInput>>(loadSavedForm)
   const [result, setResult] = useState<CalculationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filledFromContract, setFilledFromContract] = useState(false)
   const [pendingExtraction, setPendingExtraction] = useState(false)
+  const [preContractFormData, setPreContractFormData] = useState<Partial<TransactionInput> | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem(ONBOARDING_KEY))
+  const touchStartRef = useRef<number | null>(null)
+
+  // Feature 1: Auto-save to localStorage (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(formData))
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [formData])
+
+  useEffect(() => {
+    localStorage.setItem(STEP_KEY, currentStep)
+  }, [currentStep])
 
   // Triple-click on title to fill demo data
   const clickCountRef = useRef(0)
@@ -68,8 +108,42 @@ export default function App() {
       setResult(null)
       setError(null)
       setFilledFromContract(false)
+      setPreContractFormData(null)
     }
   }
+
+  // Feature 7: Dismiss onboarding
+  function handleDismissOnboarding() {
+    localStorage.setItem(ONBOARDING_KEY, '1')
+    setShowOnboarding(false)
+  }
+
+  // Feature 8: Touch/swipe navigation between steps
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't capture swipe if touching an input/select/textarea
+    const tag = (e.target as HTMLElement).tagName?.toLowerCase()
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return
+    touchStartRef.current = e.touches[0]!.clientX
+  }, [])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartRef.current === null) return
+    const diff = touchStartRef.current - e.changedTouches[0]!.clientX
+    const threshold = 80
+    if (Math.abs(diff) > threshold) {
+      const stepIdx = STEPS.findIndex(s => s.key === currentStep)
+      if (diff > 0 && stepIdx < STEPS.length - 1) {
+        // Swipe left (in RTL = next)
+        setCurrentStep(STEPS[stepIdx + 1]!.key)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } else if (diff < 0 && stepIdx > 0) {
+        // Swipe right (in RTL = prev)
+        setCurrentStep(STEPS[stepIdx - 1]!.key)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+    touchStartRef.current = null
+  }, [currentStep])
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep)
 
@@ -112,15 +186,17 @@ export default function App() {
 
   // Called by UploadContract after auto-approve
   function handleContractData(partial: Partial<TransactionInput>) {
+    // Feature 6: Save pre-contract state for undo
+    setPreContractFormData(JSON.parse(JSON.stringify(formData)))
     setFormData((prev) => ({ ...prev, ...partial }))
     setFilledFromContract(true)
     // Auto-navigate to first incomplete step after a short delay
     setTimeout(() => {
+      // Use the merged data directly since we know what we just set
       const updatedForm = { ...formData, ...partial }
-      // Determine first incomplete step with the new data
       const hasSale = !!(updatedForm.sale_date && updatedForm.sale_amount)
-      const hasSellers = !!(updatedForm.sellers?.length && updatedForm.sellers.every((s: { name: string }) => s.name))
-      const hasAcquisition = !!(updatedForm.acquisitions?.length && updatedForm.acquisitions.every((a: { acquisition_date: string; amount: number | null }) => a.acquisition_date && (a.amount ?? 0) > 0))
+      const hasSellers = !!(updatedForm.sellers?.length && updatedForm.sellers.every((s) => s.name))
+      const hasAcquisition = !!(updatedForm.acquisitions?.length && updatedForm.acquisitions.every((a) => a.acquisition_date && (a.amount ?? 0) > 0))
 
       if (!hasSale) {
         setCurrentStep('sale')
@@ -179,7 +255,19 @@ export default function App() {
     setResult(null)
     setCurrentStep('sale')
     setFilledFromContract(false)
+    setPreContractFormData(null)
+    setShowPreview(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Feature 6: Undo contract fill
+  function handleUndoContractFill() {
+    if (preContractFormData) {
+      setFormData(preContractFormData)
+      setFilledFromContract(false)
+      setPreContractFormData(null)
+      setCurrentStep('sale')
+    }
   }
 
   if (result) {
@@ -202,6 +290,10 @@ export default function App() {
   return (
     <div className="app">
       <a href="#main-content" className="skip-link">דלג לתוכן הראשי</a>
+
+      {/* Feature 7: Onboarding for new users */}
+      {showOnboarding && <Onboarding onDismiss={handleDismissOnboarding} />}
+
       <header className="app-header" style={{ position: 'relative' }}>
         <h1 onClick={handleTitleClick} style={{ cursor: 'pointer', userSelect: 'none' }}>
           מס שבח 360
@@ -215,10 +307,20 @@ export default function App() {
       {/* Upload contract */}
       <UploadContract token={token} onDataExtracted={handleContractData} onPendingChange={setPendingExtraction} />
 
+      {/* Feature 6: Undo contract fill button */}
+      {filledFromContract && preContractFormData && (
+        <div className="undo-banner" role="status">
+          <span>📄 הטופס מולא מהחוזה</span>
+          <button className="btn btn-secondary btn-sm" onClick={handleUndoContractFill} type="button">
+            ↩ בטל מילוי מחוזה
+          </button>
+        </div>
+      )}
+
       {/* Hide form while contract extraction is pending approval */}
       {!pendingExtraction && (
       <>
-      {/* Steps indicator */}
+      {/* Steps indicator - Feature 8: Enhanced mobile indicator */}
       <nav className="steps" aria-label="שלבי הטופס" id="main-content">
         {STEPS.map((step, i) => {
           const isActive = i === currentStepIndex
@@ -235,7 +337,7 @@ export default function App() {
               tabIndex={isClickable ? 0 : -1}
             >
               <span className="step-number">{i + 1}</span>
-              <span>{step.label}</span>
+              <span className="step-label">{step.label}</span>
               {filledFromContract && stepComplete && !isActive && (
                 <span className="step-contract-badge" title="מולא מהחוזה">📄</span>
               )}
@@ -244,33 +346,106 @@ export default function App() {
         })}
       </nav>
 
+      {/* Feature 8: Mobile step progress bar */}
+      <div className="mobile-step-progress" aria-hidden="true">
+        <div className="mobile-step-bar">
+          <div className="mobile-step-fill" style={{ width: `${((currentStepIndex + 1) / STEPS.length) * 100}%` }} />
+        </div>
+        <span className="mobile-step-text">שלב {currentStepIndex + 1} מתוך {STEPS.length}: {STEPS[currentStepIndex]!.label}</span>
+      </div>
+
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
         </div>
       )}
 
-      {/* Step content */}
-      {currentStep === 'sale' && (
-        <StepSale formData={formData} updateForm={updateForm} onNext={goNext} />
-      )}
-      {currentStep === 'sellers' && (
-        <StepSellers formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
-      )}
-      {currentStep === 'acquisition' && (
-        <StepAcquisition formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} filledFromContract={filledFromContract} />
-      )}
-      {currentStep === 'deductions' && (
-        <StepDeductions formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
-      )}
-      {currentStep === 'exemptions' && (
-        <StepExemptions
-          formData={formData}
-          updateForm={updateForm}
-          onPrev={goPrev}
-          onSubmit={handleSubmit}
-          loading={loading}
-        />
+      {/* Feature 1: Auto-save indicator */}
+      <div className="autosave-indicator" aria-live="polite" aria-atomic="true">
+        💾 הנתונים נשמרים אוטומטית
+      </div>
+
+      {/* Step content with Feature 8: swipe support */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {currentStep === 'sale' && (
+          <StepSale formData={formData} updateForm={updateForm} onNext={goNext} />
+        )}
+        {currentStep === 'sellers' && (
+          <StepSellers formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
+        )}
+        {currentStep === 'acquisition' && (
+          <StepAcquisition formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} filledFromContract={filledFromContract} />
+        )}
+        {currentStep === 'deductions' && (
+          <StepDeductions formData={formData} updateForm={updateForm} onNext={goNext} onPrev={goPrev} />
+        )}
+        {currentStep === 'exemptions' && (
+          <StepExemptions
+            formData={formData}
+            updateForm={updateForm}
+            onPrev={goPrev}
+            onSubmit={() => setShowPreview(true)}
+            loading={loading}
+          />
+        )}
+      </div>
+
+      {/* Feature 4: Preview before calculation */}
+      {showPreview && (
+        <div className="modal-overlay" onClick={() => setShowPreview(false)} onKeyDown={(e) => e.key === 'Escape' && setShowPreview(false)} role="dialog" aria-modal="true" aria-label="סיכום לפני חישוב">
+          <div className="modal-card preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>סיכום לפני חישוב</h3>
+              <button className="modal-close" onClick={() => setShowPreview(false)} type="button">✕</button>
+            </div>
+            <div className="preview-content">
+              <div className="preview-row">
+                <span className="preview-label">תאריך מכירה</span>
+                <span className="preview-value">{formData.sale_date || '—'}</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">סכום מכירה</span>
+                <span className="preview-value highlight">{formData.sale_amount ? formatILS(formData.sale_amount) : '—'}</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">מוכרים</span>
+                <span className="preview-value">{formData.sellers?.map(s => s.name).join(', ') || '—'}</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">תאריך רכישה</span>
+                <span className="preview-value">{formData.acquisitions?.[0]?.acquisition_date || '—'}</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">סכום רכישה</span>
+                <span className="preview-value">{formData.acquisitions?.[0]?.amount ? formatILS(formData.acquisitions[0].amount) : '—'}</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">ניכויים</span>
+                <span className="preview-value">{formData.deductions?.length || 0} הוצאות</span>
+              </div>
+              <div className="preview-row">
+                <span className="preview-label">דירה יחידה</span>
+                <span className="preview-value">{formData.exemption?.is_single_apartment ? 'כן' : 'לא'}</span>
+              </div>
+            </div>
+            <div className="preview-actions">
+              <button className="btn btn-secondary" onClick={() => setShowPreview(false)} type="button">
+                ← חזור לעריכה
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => { setShowPreview(false); handleSubmit() }}
+                disabled={loading}
+                type="button"
+              >
+                {loading ? 'מחשב...' : '✓ אשר וחשב'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {loading && (

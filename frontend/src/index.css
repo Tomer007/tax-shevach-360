@@ -1296,3 +1296,426 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================
+   UX IMPROVEMENTS - New styles
+   ============================================ */
+
+/* Feature 1: Auto-save indicator */
+.autosave-indicator {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  padding: 4px 0 12px;
+  opacity: 0.6;
+  transition: opacity var(--duration-fast);
+}
+
+/* Feature 2: Drag & Drop upload zone */
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  transition: all var(--duration-normal) var(--ease-out);
+  cursor: pointer;
+}
+
+.upload-dropzone:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.03);
+}
+
+.upload-dropzone.drag-over {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 4px var(--primary-glow);
+  transform: scale(1.01);
+}
+
+.upload-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-hint {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+/* Feature 3: Input error state */
+.input-error,
+.form-group input.input-error,
+.form-group select.input-error {
+  border-color: var(--danger) !important;
+  background: var(--danger-bg) !important;
+}
+
+.form-group input.input-error:focus,
+.form-group select.input-error:focus {
+  outline-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+/* Feature 4: Preview modal */
+.preview-modal {
+  max-width: 480px;
+}
+
+.preview-content {
+  margin-bottom: 20px;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.preview-row:last-child {
+  border-bottom: none;
+}
+
+.preview-label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.preview-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-value.highlight {
+  color: var(--success);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Feature 5: Annual Income Section */
+.income-section {
+  margin-top: 18px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: rgba(251, 191, 36, 0.04);
+}
+
+.income-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+
+.income-header:hover {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.income-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.income-toggle {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.income-panel {
+  padding: 0 16px 16px;
+  animation: cardEnter 0.2s ease forwards;
+  opacity: 0;
+}
+
+.income-description {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.income-description strong {
+  color: var(--text-secondary);
+}
+
+.income-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.income-year {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.income-year label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.income-year input {
+  padding: 8px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  text-align: center;
+  direction: ltr;
+  min-height: 36px;
+}
+
+.income-year input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-color: var(--primary);
+}
+
+.income-year input::placeholder {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+/* Feature 6: Undo banner */
+.undo-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  color: var(--accent-light);
+  animation: cardEnter var(--duration-normal) var(--ease-out) forwards;
+  opacity: 0;
+}
+
+/* Feature 7: Onboarding */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: fadeIn var(--duration-normal) var(--ease-out);
+}
+
+.onboarding-card {
+  background: var(--surface);
+  border: 1px solid var(--primary-border);
+  border-radius: var(--radius-xl);
+  padding: 36px 28px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  animation: modalSlideIn var(--duration-slow) var(--ease-out);
+}
+
+.onboarding-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 14px;
+  background: var(--primary-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.onboarding-card h2 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.onboarding-card > p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.onboarding-steps {
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.onboarding-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.onboarding-step:last-child {
+  border-bottom: none;
+}
+
+.onboarding-step-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.onboarding-step > span:last-child {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  padding-top: 2px;
+}
+
+.onboarding-tip {
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  color: var(--accent-light);
+  margin-bottom: 24px;
+  text-align: right;
+}
+
+.onboarding-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 0.95rem;
+}
+
+/* Feature 8: Mobile step progress */
+.mobile-step-progress {
+  display: none;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+.mobile-step-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.mobile-step-fill {
+  height: 100%;
+  background: var(--primary-gradient);
+  border-radius: 4px;
+  transition: width var(--duration-normal) var(--ease-out);
+}
+
+.mobile-step-text {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: center;
+  display: block;
+}
+
+/* Mobile-specific overrides for new features */
+@media (max-width: 640px) {
+  /* Feature 8: Show mobile progress, hide step labels */
+  .mobile-step-progress {
+    display: block;
+  }
+
+  .step .step-label {
+    display: none;
+  }
+
+  .steps {
+    justify-content: center;
+  }
+
+  /* Feature 5: Income grid responsive */
+  .income-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Feature 2: Upload zone */
+  .upload-dropzone {
+    padding: 16px;
+  }
+
+  .upload-hint {
+    text-align: center;
+  }
+
+  /* Feature 4: Preview modal */
+  .preview-modal {
+    max-width: 100%;
+  }
+
+  .preview-actions {
+    flex-direction: column;
+  }
+
+  .preview-actions .btn {
+    width: 100%;
+  }
+
+  /* Feature 6: Undo banner */
+  .undo-banner {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .income-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-card {
+    padding: 24px 16px;
+  }
+
+  .onboarding-card h2 {
+    font-size: 1.1rem;
+  }
+}

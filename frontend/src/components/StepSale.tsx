@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { TransactionInput, Currency } from '../types'
 
 interface Props {
@@ -7,7 +8,17 @@ interface Props {
 }
 
 export default function StepSale({ formData, updateForm, onNext }: Props) {
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const canContinue = formData.sale_date && formData.sale_amount && formData.sale_amount > 0
+
+  function markTouched(field: string) {
+    setTouched(prev => ({ ...prev, [field]: true }))
+  }
+
+  // Feature 3: Real-time validation
+  const errors: Record<string, string> = {}
+  if (touched.sale_date && !formData.sale_date) errors.sale_date = 'שדה חובה'
+  if (touched.sale_amount && (!formData.sale_amount || formData.sale_amount <= 0)) errors.sale_amount = 'יש להזין סכום חיובי'
 
   return (
     <div className="card">
@@ -22,10 +33,17 @@ export default function StepSale({ formData, updateForm, onNext }: Props) {
             type="date"
             value={formData.sale_date ?? ''}
             onChange={(e) => updateForm({ sale_date: e.target.value })}
+            onBlur={() => markTouched('sale_date')}
             required
             aria-required="true"
+            aria-invalid={!!errors.sale_date}
+            className={errors.sale_date ? 'input-error' : ''}
           />
-          <span className="helper-text">תאריך חתימת החוזה</span>
+          {errors.sale_date ? (
+            <span className="error-msg" role="alert">{errors.sale_date}</span>
+          ) : (
+            <span className="helper-text">תאריך חתימת החוזה</span>
+          )}
         </div>
         <div className="form-group">
           <label htmlFor="sale_amount">
@@ -37,11 +55,17 @@ export default function StepSale({ formData, updateForm, onNext }: Props) {
             min={0}
             value={formData.sale_amount ?? ''}
             onChange={(e) => updateForm({ sale_amount: Number(e.target.value) })}
+            onBlur={() => markTouched('sale_amount')}
             placeholder="סכום בש״ח"
             required
             aria-required="true"
+            aria-invalid={!!errors.sale_amount}
+            className={errors.sale_amount ? 'input-error' : ''}
             inputMode="numeric"
           />
+          {errors.sale_amount && (
+            <span className="error-msg" role="alert">{errors.sale_amount}</span>
+          )}
         </div>
         <div className="form-group">
           <label htmlFor="sale_currency">מטבע</label>
