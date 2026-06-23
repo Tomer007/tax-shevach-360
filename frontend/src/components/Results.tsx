@@ -6,6 +6,10 @@ interface Props {
   onReset: () => void
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function generateHtmlReport(result: CalculationResult): string {
   const bestRoute = result.route_comparison.reduce((a, b) => a.tax_amount < b.tax_amount ? a : b)
   const worstRoute = result.route_comparison.reduce((a, b) => a.tax_amount > b.tax_amount ? a : b)
@@ -21,9 +25,11 @@ function generateHtmlReport(result: CalculationResult): string {
   // For the waterfall/flow chart
   const costPercent = saleAmount > 0 ? (totalCost / saleAmount * 100) : 0
   const inflationaryPercent = saleAmount > 0 ? (inflationary / saleAmount * 100) : 0
-  const realShevachPercent = saleAmount > 0 ? (realShevach / saleAmount * 100) : 0
   const taxPercent = saleAmount > 0 ? (tax / saleAmount * 100) : 0
-  const netPercent = saleAmount > 0 ? ((saleAmount - totalCost - tax) / saleAmount * 100) : 0
+  // Net = what remains after cost and tax (clamped to avoid negative)
+  const netPercent = saleAmount > 0 ? Math.max(0, 100 - costPercent - inflationaryPercent - taxPercent) : 0
+  // For the flow chart display
+  const realShevachPercent = saleAmount > 0 ? (realShevach / saleAmount * 100) : 0
 
   // Route bar chart - normalize to max
   const maxRouteTax = Math.max(...result.route_comparison.map(r => r.tax_amount), 1)
@@ -31,7 +37,7 @@ function generateHtmlReport(result: CalculationResult): string {
   const sellersHtml = result.seller_results.map((s) => `
     <div class="seller-section">
       <div class="seller-header-row">
-        <h3>${s.seller_name}</h3>
+        <h3>${escapeHtml(s.seller_name)}</h3>
         <span class="share-badge">${s.share_percent}%</span>
       </div>
       <div class="data-grid">
@@ -264,9 +270,9 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 
 /* Gauge */
 .gauge-container{text-align:center;padding:12px 0}
-.gauge{position:relative;height:20px;background:linear-gradient(90deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);border-radius:10px;margin-bottom:8px;opacity:0.3}
-.gauge-fill{position:absolute;inset:0;height:100%;background:linear-gradient(90deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);border-radius:10px;opacity:1}
-.gauge-marker{position:absolute;top:-8px;transform:translateX(50%);display:flex;flex-direction:column;align-items:center}
+.gauge{position:relative;height:20px;background:rgba(255,255,255,0.06);border-radius:10px;margin-bottom:8px}
+.gauge-fill{position:absolute;top:0;right:0;height:100%;background:linear-gradient(270deg,#10b981 0%,#f59e0b 50%,#ef4444 100%);border-radius:10px}
+.gauge-marker{position:absolute;top:-8px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
 .gauge-marker span{background:#1c1c2e;border:2px solid #34d399;border-radius:6px;padding:3px 10px;font-size:0.78rem;font-weight:700;color:#34d399;white-space:nowrap}
 .gauge-labels{display:flex;justify-content:space-between;font-size:0.68rem;color:#52525b;margin-bottom:12px}
 .gauge-explanation{font-size:0.75rem;color:#71717a;margin-top:8px}
@@ -372,18 +378,18 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
     <h2 class="infographic-title">💸 לאן הולך הכסף?</h2>
     <div class="stacked-bar-container">
       <div class="stacked-bar">
-        <div class="stacked-seg seg-cost" style="width:${costPercent}%" title="עלות מתואמת">
+        ${costPercent > 0 ? `<div class="stacked-seg seg-cost" style="width:${costPercent}%" title="עלות מתואמת">
           ${costPercent > 8 ? `<span>${costPercent.toFixed(0)}%</span>` : ''}
-        </div>
-        <div class="stacked-seg seg-inflation" style="width:${inflationaryPercent}%" title="אינפלציה">
+        </div>` : ''}
+        ${inflationaryPercent > 0 ? `<div class="stacked-seg seg-inflation" style="width:${inflationaryPercent}%" title="אינפלציה">
           ${inflationaryPercent > 8 ? `<span>${inflationaryPercent.toFixed(0)}%</span>` : ''}
-        </div>
-        <div class="stacked-seg seg-net" style="width:${netPercent > 0 ? netPercent : 0}%" title="רווח נקי">
+        </div>` : ''}
+        ${netPercent > 0 ? `<div class="stacked-seg seg-net" style="width:${netPercent}%" title="רווח נקי">
           ${netPercent > 8 ? `<span>${netPercent.toFixed(0)}%</span>` : ''}
-        </div>
-        <div class="stacked-seg seg-tax" style="width:${taxPercent}%" title="מס">
+        </div>` : ''}
+        ${taxPercent > 0 ? `<div class="stacked-seg seg-tax" style="width:${taxPercent}%" title="מס">
           ${taxPercent > 5 ? `<span>${taxPercent.toFixed(0)}%</span>` : ''}
-        </div>
+        </div>` : ''}
       </div>
       <div class="stacked-legend">
         <div class="legend-item"><span class="legend-dot" style="background:#6366f1"></span>עלות מתואמת</div>
@@ -428,7 +434,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
     <div class="gauge-container">
       <div class="gauge">
         <div class="gauge-fill" style="width:${Math.min(bestRoute.effective_rate * 2, 100)}%"></div>
-        <div class="gauge-marker" style="right:${Math.min(bestRoute.effective_rate * 2, 100)}%">
+        <div class="gauge-marker" style="left:${Math.min(bestRoute.effective_rate * 2, 100)}%">
           <span>${formatPercent(bestRoute.effective_rate)}</span>
         </div>
       </div>
