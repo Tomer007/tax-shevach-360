@@ -195,7 +195,7 @@ def parse_contract_images(images_b64: list[str]) -> ParsedContract:
 
     # Build messages with images
     content_parts: list[dict] = [
-        {"type": "text", "text": "Extract transaction details from this Israeli real estate contract (חוזה מכר). The pages are shown as images below."},
+        {"type": "text", "text": "Extract transaction details from this Israeli real estate contract (חוזה מכר). The pages are shown as images below.\n\nIMPORTANT: Look carefully at ALL pages including the נסח רישום (land registry extract) pages. These pages contain tables with 'מהות פעולה: מכר' and dates — these dates are the ACQUISITION dates (when the seller originally bought the property). You MUST include them in the 'acquisitions' array."},
     ]
     for img_b64 in images_b64:
         content_parts.append({
