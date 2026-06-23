@@ -336,12 +336,12 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 
   <!-- INFOGRAPHIC: Transaction Flow -->
   <div class="infographic-section">
-    <h2 class="infographic-title">📊 תמונת העסקה במבט אחד</h2>
+    <h2 class="infographic-title">תמונת העסקה במבט אחד</h2>
     
     <!-- Flow: Sale → Components -->
     <div class="flow-chart">
       <div class="flow-item flow-sale">
-        <div class="flow-icon">🏠</div>
+        
         <div class="flow-label">סכום מכירה</div>
         <div class="flow-amount">${formatILS(saleAmount)}</div>
       </div>
@@ -365,7 +365,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
       </div>
       <div class="flow-arrow">→</div>
       <div class="flow-item flow-tax">
-        <div class="flow-icon">💰</div>
+        
         <div class="flow-label">מס לתשלום</div>
         <div class="flow-amount">${formatILS(tax)}</div>
         <div class="flow-pct">${taxPercent.toFixed(1)}% מהמכירה</div>
@@ -375,7 +375,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 
   <!-- INFOGRAPHIC: Stacked Bar - Where does the money go? -->
   <div class="infographic-section">
-    <h2 class="infographic-title">💸 לאן הולך הכסף?</h2>
+    <h2 class="infographic-title">לאן הולך הכסף?</h2>
     <div class="stacked-bar-container">
       <div class="stacked-bar">
         ${costPercent > 0 ? `<div class="stacked-seg seg-cost" style="width:${costPercent}%" title="עלות מתואמת">
@@ -402,7 +402,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 
   <!-- INFOGRAPHIC: Route Comparison Bar Chart -->
   <div class="infographic-section">
-    <h2 class="infographic-title">⚖️ השוואת מסלולי מיסוי</h2>
+    <h2 class="infographic-title">השוואת מסלולי מיסוי</h2>
     <div class="bar-chart">
       ${result.route_comparison.map(r => {
         const barWidth = (r.tax_amount / maxRouteTax) * 100
@@ -419,7 +419,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
     </div>
     ${totalSavings > 0 ? `
     <div class="savings-callout">
-      <div class="savings-icon">🎯</div>
+      
       <div class="savings-content">
         <div class="savings-title">חיסכון במסלול המומלץ</div>
         <div class="savings-amount">${formatILS(totalSavings)}</div>
@@ -430,7 +430,7 @@ body{font-family:'Heebo',sans-serif;background:#0a0a0f;color:#e4e4e7;line-height
 
   <!-- INFOGRAPHIC: Effective Tax Rate Gauge -->
   <div class="infographic-section">
-    <h2 class="infographic-title">📈 שיעור מס אפקטיבי</h2>
+    <h2 class="infographic-title">שיעור מס אפקטיבי</h2>
     <div class="gauge-container">
       <div class="gauge">
         <div class="gauge-fill" style="width:${Math.min(bestRoute.effective_rate * 2, 100)}%"></div>
@@ -527,10 +527,10 @@ export default function Results({ result, onReset }: Props) {
 
       {/* INFOGRAPHIC: Transaction Flow - animated */}
       <div className="card">
-        <h2 className="card-title">📊 תמונת העסקה במבט אחד</h2>
+        <h2 className="card-title">תמונת העסקה במבט אחד</h2>
         <div className="flow-infographic">
           <div className="flow-node flow-node-sale flow-animate-1">
-            <div className="flow-node-icon">🏠</div>
+            
             <div className="flow-node-label">סכום מכירה</div>
             <div className="flow-node-amount">{formatILS(saleAmount)}</div>
           </div>
@@ -564,7 +564,7 @@ export default function Results({ result, onReset }: Props) {
           </div>
 
           <div className="flow-node flow-node-tax flow-animate-7">
-            <div className="flow-node-icon">💰</div>
+            
             <div className="flow-node-label">מס לתשלום</div>
             <div className="flow-node-amount flow-node-amount-tax">{formatILS(taxAmount)}</div>
             <div className="flow-node-pct">{taxPct.toFixed(1)}% מהמכירה</div>
@@ -574,7 +574,7 @@ export default function Results({ result, onReset }: Props) {
 
       {/* INFOGRAPHIC: Where does the money go? */}
       <div className="card">
-        <h2 className="card-title">💸 לאן הולך הכסף?</h2>
+        <h2 className="card-title">לאן הולך הכסף?</h2>
         <div className="infographic-bar-container">
           <div className="infographic-stacked-bar">
             {costPct > 0 && (
@@ -621,7 +621,7 @@ export default function Results({ result, onReset }: Props) {
 
       {/* INFOGRAPHIC: Route comparison bar chart */}
       <div className="card">
-        <h2 className="card-title">⚖️ השוואת מסלולי מיסוי</h2>
+        <h2 className="card-title">השוואת מסלולי מיסוי</h2>
         <div className="infographic-routes">
           {result.route_comparison.map((route) => {
             const barWidth = (route.tax_amount / maxRouteTax) * 100
@@ -645,7 +645,7 @@ export default function Results({ result, onReset }: Props) {
         </div>
         {totalSavings > 0 && (
           <div className="infographic-savings">
-            <span className="infographic-savings-icon">🎯</span>
+            
             <div className="infographic-savings-content">
               <div className="infographic-savings-label">חיסכון במסלול המומלץ</div>
               <div className="infographic-savings-amount">{formatILS(totalSavings)}</div>
@@ -656,7 +656,7 @@ export default function Results({ result, onReset }: Props) {
 
       {/* INFOGRAPHIC: Effective tax rate */}
       <div className="card">
-        <h2 className="card-title">📈 שיעור מס אפקטיבי</h2>
+        <h2 className="card-title">שיעור מס אפקטיבי</h2>
         <div className="infographic-gauge">
           <div className="infographic-gauge-track">
             <div
@@ -793,7 +793,7 @@ export default function Results({ result, onReset }: Props) {
       {/* Actions */}
       <div className="btn-group" style={{ justifyContent: 'center', borderTop: 'none' }}>
         <button className="btn btn-primary" onClick={exportHtml} type="button">
-          📄 הורד דו״ח HTML
+          הורד דו״ח HTML
         </button>
         <button className="btn btn-secondary" onClick={exportJson} type="button">
           ייצוא JSON
