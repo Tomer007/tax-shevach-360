@@ -5,7 +5,7 @@ import type { TransactionInput } from '../types'
 interface Props {
   token: string
   onDataExtracted: (partial: Partial<TransactionInput>) => void
-  onPendingChange?: (pending: boolean) => void
+  onPendingChange: (pending: boolean) => void
 }
 
 interface ExtractedData {
@@ -64,7 +64,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
       setExtractedData(data)
 
       // Signal that we have pending data (form should be hidden)
-      onPendingChange?.(true)
+      onPendingChange(true)
 
       // Auto-approve if confidence is high and critical fields are present
       if (data.confidence === 'high' && data.sale_amount && data.sale_date) {
@@ -116,7 +116,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
     if (partial) {
       setApproved(true)
       setShowDetails(false)
-      onPendingChange?.(false)
+      onPendingChange(false)
       onDataExtracted(partial)
     }
   }
@@ -186,11 +186,8 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
   function handleApprove() {
     if (!extractedData) return
 
-    console.log('[UploadContract] handleApprove called, extractedData:', JSON.stringify(extractedData, null, 2))
-
     // If critical fields are missing, expand details so user can fill them
     if (!extractedData.sale_amount || !extractedData.sale_date) {
-      console.log('[UploadContract] Missing critical fields - sale_amount:', extractedData.sale_amount, 'sale_date:', extractedData.sale_date)
       setShowDetails(true)
       return
     }
@@ -198,10 +195,9 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
     const partial = buildPartial(extractedData)
     if (!partial) return
 
-    console.log('[UploadContract] Sending to form:', JSON.stringify(partial, null, 2))
     setApproved(true)
     setShowDetails(false)
-    onPendingChange?.(false)
+    onPendingChange(false)
     onDataExtracted(partial)
   }
 
@@ -209,7 +205,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
     setExtractedData(null)
     setApproved(false)
     setShowDetails(false)
-    onPendingChange?.(false)
+    onPendingChange(false)
   }
 
   const confidenceLabel = (c: string) =>

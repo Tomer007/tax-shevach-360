@@ -39,15 +39,6 @@ class TestCodeName:
     def test_empty_code_name(self):
         assert verify_code_name("") is False
 
-    def test_verify_code_endpoint_valid(self):
-        response = client.post("/api/auth/verify-code", json={"code_name": "POKER"})
-        assert response.status_code == 200
-        assert response.json()["valid"] is True
-
-    def test_verify_code_endpoint_invalid(self):
-        response = client.post("/api/auth/verify-code", json={"code_name": "WRONG"})
-        assert response.status_code == 403
-
 
 class TestAuthentication:
     """Test user authentication (tomer/gur)."""

@@ -42,15 +42,6 @@ class TestRateLimiting:
         resp = client.post("/api/auth/login", json={"username": "tomer", "password": "wrong"})
         assert resp.status_code == 429
 
-    def test_code_verify_only_records_failure(self):
-        """Failed code verification counts but success does not."""
-        for _ in range(4):
-            resp = client.post("/api/auth/verify-code", json={"code_name": "WRONG"})
-            assert resp.status_code == 403
-        # Should still be able to succeed
-        resp = client.post("/api/auth/verify-code", json={"code_name": "POKER"})
-        assert resp.status_code == 200
-
 
 class TestUploadContract:
     """Test contract upload with Vision fallback and caching."""

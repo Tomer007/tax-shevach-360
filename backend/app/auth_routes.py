@@ -10,7 +10,6 @@ import fitz  # PyMuPDF
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 
 from app.auth import (
-    CodeNameRequest,
     LoginRequest,
     Token,
     _check_rate_limit,
@@ -18,7 +17,6 @@ from app.auth import (
     authenticate_user,
     create_access_token,
     get_current_user,
-    verify_code_name,
 )
 from app.contract_parser import ParsedContract, parse_contract_text, parse_contract_images
 from app.email_service import send_contract_result_email
@@ -44,25 +42,6 @@ def _get_client_ip(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-@router.post("/auth/verify-code")
-def verify_access_code(request: CodeNameRequest, raw_request: Request):
-    """Verify the access code name (POKER) before allowing contract upload."""
-    client_ip = _get_client_ip(raw_request)
-    if not _check_rate_limit(f"code:{client_ip}"):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="יותר מדי ניסיונות. נסה שוב בעוד מספר דקות.",
-        )
-
-    if not verify_code_name(request.code_name):
-        _record_attempt(f"code:{client_ip}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="קוד גישה שגוי",
-        )
-    return {"valid": True, "message": "קוד גישה תקין"}
 
 
 @router.post("/auth/login", response_model=Token)
@@ -164,13 +143,7 @@ async def upload_contract(
 
                 if images_b64:
                     result = parse_contract_images(images_b64)
-                    logger.warning(
-                        f"\n{'='*60}\n"
-                        f"PARSED CONTRACT (Vision) [{file.filename}]\n"
-                        f"{'='*60}\n"
-                        f"{json.dumps(result.model_dump(), ensure_ascii=False, indent=2, default=str)}\n"
-                        f"{'='*60}"
-                    )
+                    logger.debug(f"PARSED CONTRACT (Vision) [{file.filename}]: {json.dumps(result.model_dump(), ensure_ascii=False, default=str)}")
                     user_email = current_user.get("email")
                     email_sent = send_contract_result_email(result.model_dump(), file.filename or "unknown", file_content=content, user_email=user_email)
                     if not email_sent:
@@ -215,8 +188,6 @@ async def upload_contract(
     if is_pdf and result.confidence == "low" and not result.sale_amount:
         logger.info(f"Low confidence text parse for {file.filename}, retrying with Vision")
         try:
-
-
             doc = fitz.open(stream=content, filetype="pdf")
             images_b64: list[str] = []
             for page_num in range(min(len(doc), 8)):
@@ -228,7 +199,6 @@ async def upload_contract(
 
             if images_b64:
                 vision_result = parse_contract_images(images_b64)
-                # Use vision result only if it's better (has sale_amount)
                 if vision_result.sale_amount:
                     result = vision_result
                     logger.info(f"Vision retry succeeded for {file.filename}")
@@ -238,13 +208,7 @@ async def upload_contract(
 
     # Log extracted fields as pretty JSON for debugging
 
-    logger.warning(
-        f"\n{'='*60}\n"
-        f"PARSED CONTRACT [{file.filename}]\n"
-        f"{'='*60}\n"
-        f"{json.dumps(result.model_dump(), ensure_ascii=False, indent=2, default=str)}\n"
-        f"{'='*60}"
-    )
+    logger.debug(f"PARSED CONTRACT [{file.filename}]: {json.dumps(result.model_dump(), ensure_ascii=False, default=str)}")
 
     # Send email notification with attachment (non-blocking, failures are logged)
     user_email = current_user.get("email")
@@ -275,7 +239,7 @@ def calculate_and_notify(
         raise HTTPException(status_code=422, detail=f"Invalid input: {e}")
     except Exception as e:
         logger.error(f"Calculation error: {type(e).__name__}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"שגיאה בחישוב: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="שגיאה בחישוב. אנא בדוק את הנתונים ונסה שוב.")
 
     # Send email with results
     user_email = current_user.get("email")
@@ -286,8 +250,6 @@ def calculate_and_notify(
 
 def _send_calculation_email(result_data: dict, user: dict, user_email: str | None) -> None:
     """Send calculation results email."""
-
-    import os
     import smtplib
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
