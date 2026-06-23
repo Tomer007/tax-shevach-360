@@ -387,7 +387,7 @@ export default function App() {
 
       {/* Feature 1: Auto-save indicator */}
       <div className="autosave-indicator" aria-live="polite" aria-atomic="true">
-        💾 הנתונים נשמרים אוטומטית
+        הנתונים נשמרים אוטומטית
       </div>
 
       {/* Step content with Feature 8: swipe support */}

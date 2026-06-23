@@ -270,7 +270,7 @@ export default function UploadContract({ token, onDataExtracted, onPendingChange
                 קורא חוזה...
               </>
             ) : (
-              '📄 העלה חוזה'
+              'העלה חוזה'
             )}
           </button>
           <span className="upload-hint">או גרור קובץ לכאן (PDF, DOC, TXT)</span>
