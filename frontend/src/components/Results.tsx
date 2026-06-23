@@ -487,6 +487,18 @@ export default function Results({ result, onReset }: Props) {
   }
 
   const bestRoute = result.route_comparison.reduce((a, b) => a.tax_amount < b.tax_amount ? a : b)
+  const worstRoute = result.route_comparison.reduce((a, b) => a.tax_amount > b.tax_amount ? a : b)
+  const totalSavings = worstRoute.tax_amount - bestRoute.tax_amount
+  const maxRouteTax = Math.max(...result.route_comparison.map(r => r.tax_amount), 1)
+
+  // Percentages for infographics
+  const saleAmount = result.seller_results.reduce((sum, s) => sum + s.sale_amount_ils, 0)
+  const totalCost = result.seller_results.reduce((sum, s) => sum + s.total_cost_indexed, 0)
+  const taxAmount = result.full_tax
+  const costPct = saleAmount > 0 ? (totalCost / saleAmount * 100) : 0
+  const inflationPct = saleAmount > 0 ? (result.full_inflationary / saleAmount * 100) : 0
+  const taxPct = saleAmount > 0 ? (taxAmount / saleAmount * 100) : 0
+  const netPct = Math.max(0, 100 - costPct - inflationPct - taxPct)
 
   return (
     <div>
@@ -513,9 +525,118 @@ export default function Results({ result, onReset }: Props) {
         </div>
       </div>
 
-      {/* Route comparison */}
+      {/* INFOGRAPHIC: Where does the money go? */}
       <div className="card">
-        <h2 className="card-title">השוואת מסלולים</h2>
+        <h2 className="card-title">💸 לאן הולך הכסף?</h2>
+        <div className="infographic-bar-container">
+          <div className="infographic-stacked-bar">
+            {costPct > 0 && (
+              <div className="infographic-seg infographic-seg-cost" style={{ width: `${costPct}%` }}>
+                {costPct > 10 && <span>{costPct.toFixed(0)}%</span>}
+              </div>
+            )}
+            {inflationPct > 0 && (
+              <div className="infographic-seg infographic-seg-inflation" style={{ width: `${inflationPct}%` }}>
+                {inflationPct > 10 && <span>{inflationPct.toFixed(0)}%</span>}
+              </div>
+            )}
+            {netPct > 0 && (
+              <div className="infographic-seg infographic-seg-net" style={{ width: `${netPct}%` }}>
+                {netPct > 10 && <span>{netPct.toFixed(0)}%</span>}
+              </div>
+            )}
+            {taxPct > 0 && (
+              <div className="infographic-seg infographic-seg-tax" style={{ width: `${taxPct}%` }}>
+                {taxPct > 6 && <span>{taxPct.toFixed(0)}%</span>}
+              </div>
+            )}
+          </div>
+          <div className="infographic-legend">
+            <div className="infographic-legend-item">
+              <span className="infographic-legend-dot" style={{ background: '#6366f1' }} />
+              <span>עלות מתואמת</span>
+            </div>
+            <div className="infographic-legend-item">
+              <span className="infographic-legend-dot" style={{ background: '#f59e0b' }} />
+              <span>אינפלציה</span>
+            </div>
+            <div className="infographic-legend-item">
+              <span className="infographic-legend-dot" style={{ background: '#10b981' }} />
+              <span>רווח נקי</span>
+            </div>
+            <div className="infographic-legend-item">
+              <span className="infographic-legend-dot" style={{ background: '#ef4444' }} />
+              <span>מס</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* INFOGRAPHIC: Route comparison bar chart */}
+      <div className="card">
+        <h2 className="card-title">⚖️ השוואת מסלולי מיסוי</h2>
+        <div className="infographic-routes">
+          {result.route_comparison.map((route) => {
+            const barWidth = (route.tax_amount / maxRouteTax) * 100
+            const isBest = route.tax_amount === bestRoute.tax_amount
+            return (
+              <div key={route.route_name} className={`infographic-route-row ${isBest ? 'infographic-route-best' : ''}`}>
+                <div className="infographic-route-label">
+                  {routeNameHebrew(route.route_name)}
+                  {isBest && <span className="badge" style={{ marginInlineStart: 8 }}>מומלץ</span>}
+                </div>
+                <div className="infographic-route-track">
+                  <div
+                    className={`infographic-route-fill ${isBest ? 'infographic-route-fill-best' : ''}`}
+                    style={{ width: `${barWidth}%` }}
+                  />
+                </div>
+                <div className="infographic-route-value">{formatILS(route.tax_amount)}</div>
+              </div>
+            )
+          })}
+        </div>
+        {totalSavings > 0 && (
+          <div className="infographic-savings">
+            <span className="infographic-savings-icon">🎯</span>
+            <div className="infographic-savings-content">
+              <div className="infographic-savings-label">חיסכון במסלול המומלץ</div>
+              <div className="infographic-savings-amount">{formatILS(totalSavings)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* INFOGRAPHIC: Effective tax rate */}
+      <div className="card">
+        <h2 className="card-title">📈 שיעור מס אפקטיבי</h2>
+        <div className="infographic-gauge">
+          <div className="infographic-gauge-track">
+            <div
+              className="infographic-gauge-fill"
+              style={{ width: `${Math.min(bestRoute.effective_rate * 2, 100)}%` }}
+            />
+            <div
+              className="infographic-gauge-marker"
+              style={{ left: `${Math.min(bestRoute.effective_rate * 2, 100)}%` }}
+            >
+              <span>{formatPercent(bestRoute.effective_rate)}</span>
+            </div>
+          </div>
+          <div className="infographic-gauge-labels">
+            <span>0%</span>
+            <span>25%</span>
+            <span>50%</span>
+          </div>
+          <p className="infographic-gauge-desc">
+            שיעור המס האפקטיבי מהשבח הריאלי — ככל שנמוך יותר, כך המסלול משתלם יותר
+          </p>
+        </div>
+      </div>
+
+      {/* Route comparison - detailed */}
+      <div className="card">
+        <h2 className="card-title">השוואת מסלולים — פירוט</h2>
         <div className="route-comparison" role="list" aria-label="מסלולי מיסוי">
           {result.route_comparison.map((route) => {
             const isBest = route.tax_amount === bestRoute.tax_amount

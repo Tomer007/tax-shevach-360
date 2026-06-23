@@ -1748,3 +1748,219 @@ body {
   align-items: center;
   gap: 4px;
 }
+
+/* In-app Infographics */
+.infographic-bar-container {
+  padding: 8px 0;
+}
+
+.infographic-stacked-bar {
+  display: flex;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.infographic-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2px;
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.infographic-seg span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.infographic-seg-cost { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+.infographic-seg-inflation { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.infographic-seg-net { background: linear-gradient(135deg, #10b981, #059669); }
+.infographic-seg-tax { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+.infographic-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.infographic-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.infographic-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* Route bar chart */
+.infographic-routes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.infographic-route-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 90px;
+  align-items: center;
+  gap: 12px;
+}
+
+.infographic-route-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.infographic-route-best .infographic-route-label {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.infographic-route-track {
+  height: 22px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.infographic-route-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 6px;
+  transition: width var(--duration-slow) var(--ease-out);
+}
+
+.infographic-route-fill-best {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.infographic-route-value {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Savings callout */
+.infographic-savings {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius);
+  margin-top: 4px;
+}
+
+.infographic-savings-icon {
+  font-size: 1.6rem;
+}
+
+.infographic-savings-content {
+  flex: 1;
+}
+
+.infographic-savings-label {
+  font-size: 0.75rem;
+  color: #a7f3d0;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.infographic-savings-amount {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gauge */
+.infographic-gauge {
+  padding: 12px 0;
+}
+
+.infographic-gauge-track {
+  position: relative;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  margin-bottom: 8px;
+  overflow: visible;
+}
+
+.infographic-gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+  border-radius: 9px;
+}
+
+.infographic-gauge-marker {
+  position: absolute;
+  top: -10px;
+  transform: translateX(-50%);
+}
+
+.infographic-gauge-marker span {
+  display: block;
+  background: var(--surface);
+  border: 2px solid var(--success);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--success);
+  white-space: nowrap;
+}
+
+.infographic-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  padding: 0 2px;
+  margin-bottom: 10px;
+}
+
+.infographic-gauge-desc {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* Mobile responsive for infographics */
+@media (max-width: 640px) {
+  .infographic-route-row {
+    grid-template-columns: 80px 1fr 70px;
+    gap: 8px;
+  }
+
+  .infographic-route-label {
+    font-size: 0.7rem;
+  }
+
+  .infographic-savings {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .infographic-legend {
+    gap: 10px;
+  }
+}
