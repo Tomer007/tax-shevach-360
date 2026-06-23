@@ -68,6 +68,10 @@ export default function App() {
   )
   const [currentStep, setCurrentStep] = useState<StepKey>(loadSavedStep)
   const [formData, setFormData] = useState<Partial<TransactionInput>>(loadSavedForm)
+  const [furthestStep, setFurthestStep] = useState<number>(() => {
+    const savedStep = loadSavedStep()
+    return STEPS.findIndex(s => s.key === savedStep)
+  })
   const [result, setResult] = useState<CalculationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -162,8 +166,12 @@ export default function App() {
     return <LoginPage onLogin={handleLogin} />
   }
 
-  // Determine which steps are "complete" based on formData content
+  // Determine which steps are "complete" — must have valid data AND user must have moved past it
   function isStepComplete(stepKey: StepKey): boolean {
+    const stepIdx = STEPS.findIndex(s => s.key === stepKey)
+    // Only show as complete if user has navigated past this step (or contract filled it)
+    if (!filledFromContract && stepIdx >= furthestStep) return false
+
     switch (stepKey) {
       case 'sale':
         return !!(formData.sale_date && formData.sale_amount && formData.sale_amount > 0)
@@ -172,7 +180,7 @@ export default function App() {
       case 'acquisition':
         return !!(formData.acquisitions?.length && formData.acquisitions.every(a => a.acquisition_date))
       case 'deductions':
-        return currentStepIndex > STEPS.findIndex(s => s.key === 'deductions')
+        return stepIdx < furthestStep || (filledFromContract && stepIdx < currentStepIndex)
       case 'exemptions':
         return false // Never pre-complete — it's the final step with the submit button
       default:
@@ -190,6 +198,8 @@ export default function App() {
     setPreContractFormData(JSON.parse(JSON.stringify(formData)))
     setFormData((prev) => ({ ...prev, ...partial }))
     setFilledFromContract(true)
+    // Mark all steps as visited since contract provides data
+    setFurthestStep(STEPS.length - 1)
     // Auto-navigate to first incomplete step after a short delay
     setTimeout(() => {
       // Use the merged data directly since we know what we just set
@@ -215,6 +225,7 @@ export default function App() {
     const nextIndex = currentStepIndex + 1
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]!.key)
+      setFurthestStep(prev => Math.max(prev, nextIndex))
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -254,6 +265,7 @@ export default function App() {
   function handleReset() {
     setResult(null)
     setCurrentStep('sale')
+    setFurthestStep(0)
     setFilledFromContract(false)
     setPreContractFormData(null)
     setShowPreview(false)
