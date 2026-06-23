@@ -207,7 +207,7 @@ export default function App() {
           מס שבח 360
         </h1>
         <p>מחשבון מס שבח מקרקעין</p>
-        <button className="btn btn-secondary btn-sm" onClick={handleLogout} type="button" style={{ position: 'absolute', top: 12, left: 12 }}>
+        <button className="btn btn-secondary btn-sm" onClick={handleLogout} type="button" style={{ position: 'absolute', top: 12, left: 12, zIndex: 1 }}>
           התנתק
         </button>
       </header>

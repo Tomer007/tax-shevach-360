@@ -733,19 +733,22 @@ body {
   .form-grid { grid-template-columns: 1fr; gap: 14px; }
   .form-grid.cols-3 { grid-template-columns: 1fr; }
 
-  .steps { gap: 2px; padding: 4px; }
-  .step { padding: 8px 10px; font-size: 0.7rem; }
+  .steps { gap: 2px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; justify-content: flex-start; }
+  .step { padding: 8px 10px; font-size: 0.7rem; flex-shrink: 0; }
   .step-number { width: 18px; height: 18px; }
 
   .btn-group { flex-direction: column; }
   .btn { width: 100%; }
 
   .result-summary { grid-template-columns: 1fr 1fr; }
+
+  .upload-section { flex-direction: column; align-items: stretch; }
+  .upload-section .btn { width: 100%; }
 }
 
 @media (max-width: 380px) {
   .result-summary { grid-template-columns: 1fr; }
-  .step > span:not(.step-number) { display: none; }
+  .step > span:not(.step-number):not(.step-contract-badge) { display: none; }
 }
 
 /* Login Page */
